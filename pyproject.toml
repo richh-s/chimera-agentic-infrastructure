@@ -1,0 +1,17 @@
+[project]
+name = "chimera-agentic-infrastructure"
+version = "0.1.0"
+description = "Spec-driven, governed agentic infrastructure for Project Chimera"
+requires-python = ">=3.11"
+
+dependencies = [
+    "pydantic>=2.6",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
