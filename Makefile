@@ -16,7 +16,7 @@ test:
 
 ## Run linting (Ruff) inside Docker
 lint:
-	docker run --rm $(IMAGE_NAME) ruff check .
+	docker run --rm $(IMAGE_NAME) "ruff check ."
 
 ## Optional: verify spec structure exists
 spec-check:

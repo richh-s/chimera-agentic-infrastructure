@@ -10,17 +10,19 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Clean any existing pip cache
+RUN pip cache purge
+
+# Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-RUN pip install --no-cache-dir uv
+# Install uv if not already installed
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir uv
 
-
-RUN uv pip install --system --group dev
+RUN uv pip install --system --group dev --no-cache
 
 COPY . .
 
-
-RUN useradd -m chimera
-USER chimera
-
-ENTRYPOINT ["pytest"]
+ENTRYPOINT ["sh", "-c"]
+CMD ["pytest"]
