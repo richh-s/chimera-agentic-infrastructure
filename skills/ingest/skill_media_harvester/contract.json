@@ -1,0 +1,117 @@
+{
+  "skill_name": "skill_media_harvester",
+  "version": "1.1.0",
+  "description": "Downloads, validates, and extracts metadata from external media assets for controlled ingestion.",
+  "inputs": {
+    "url": {
+      "type": "string",
+      "required": true,
+      "validation": "uri",
+      "pattern": "^https://",
+      "max_length": 2048,
+      "example": "https://example.com/video.mp4",
+      "description": "Publicly accessible media URL. Must use HTTPS for security."
+    },
+    "media_type": {
+      "type": "string",
+      "required": true,
+      "validation": "enum",
+      "allowed_values": ["video", "image", "audio"],
+      "example": "video",
+      "description": "Expected media type for validation."
+    },
+    "quality": {
+      "type": "string",
+      "required": false,
+      "validation": "enum",
+      "allowed_values": ["low", "medium", "high"],
+      "default": "medium",
+      "description": "Requested quality level for adaptive media downloads."
+    }
+  },
+  "outputs": {
+    "local_path": {
+      "type": "string",
+      "description": "Filesystem or object-store path to the downloaded media."
+    },
+    "size_mb": {
+      "type": "number",
+      "description": "Size of the downloaded media in megabytes."
+    },
+    "checksum": {
+      "type": "string",
+      "description": "SHA-256 checksum of the media file."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Extracted technical metadata from the media file.",
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "duration_seconds": {
+          "type": "number"
+        },
+        "dimensions": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          }
+        },
+        "codec": {
+          "type": "string"
+        },
+        "bitrate_kbps": {
+          "type": "number"
+        }
+      }
+    },
+    "download_status": {
+      "type": "object",
+      "description": "Verification results of the media download.",
+      "properties": {
+        "verified": {
+          "type": "boolean"
+        },
+        "verification_method": {
+          "type": "string"
+        },
+        "verification_timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 60,
+    "rate_limit": "10/min",
+    "max_file_size_mb": 500,
+    "max_duration_seconds": 3600,
+    "allowed_formats": {
+      "video": ["mp4", "webm", "mov"],
+      "image": ["jpg", "jpeg", "png", "gif", "webp"],
+      "audio": ["mp3", "wav", "ogg", "m4a"]
+    },
+    "resource_limits": {
+      "memory_mb": 256,
+      "cpu_cores": 1,
+      "disk_mb": 1024
+    }
+  },
+  "security": {
+    "requires_auth": false,
+    "allowed_domains": [],
+    "blocked_domains": [],
+    "data_classification": "external",
+    "ssl_required": true,
+    "virus_scan_required": true,
+    "content_filtering": true,
+    "privacy_preserving": true
+  }
+}

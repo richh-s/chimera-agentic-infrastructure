@@ -1,0 +1,244 @@
+{
+  "skill_name": "skill_vocal_analyzer",
+  "version": "1.2.0",
+  "description": "Transcribes audio and extracts detailed vocal, quality, and speaker signals.",
+  "inputs": {
+    "audio_path": {
+      "type": "string",
+      "required": true,
+      "pattern": "^[a-zA-Z0-9_\\-\\.\\/]+$",
+      "max_length": 500,
+      "example": "skill_media_harvester/2024_123456_abc123.mp4",
+      "description": "Internal path to audio or video file within Chimera storage."
+    },
+    "audio_format_hint": {
+      "type": "string",
+      "required": false,
+      "validation": "enum",
+      "allowed_values": ["mp3", "wav", "mp4", "webm", "m4a", "ogg"],
+      "description": "Optional hint to improve format detection and processing."
+    },
+    "language": {
+      "type": "string",
+      "required": false,
+      "validation": "regex",
+      "pattern": "^[a-z]{2}$",
+      "example": "en",
+      "description": "ISO-639-1 language code. Auto-detected if omitted."
+    },
+    "transcription_quality": {
+      "type": "string",
+      "required": false,
+      "validation": "enum",
+      "allowed_values": ["fast", "balanced", "accurate"],
+      "default": "balanced",
+      "description": "Controls transcription accuracy vs. processing cost."
+    }
+  },
+  "outputs": {
+    "transcript": {
+      "type": "string",
+      "description": "Full transcribed text concatenated from all segments."
+    },
+    "segments": {
+      "type": "array",
+      "description": "Timestamped transcript segments with speaker attribution.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "start_sec": {
+            "type": "number",
+            "description": "Segment start time in seconds"
+          },
+          "end_sec": {
+            "type": "number",
+            "description": "Segment end time in seconds"
+          },
+          "text": {
+            "type": "string",
+            "description": "Transcribed text for this segment"
+          },
+          "speaker": {
+            "type": "string",
+            "pattern": "^SPEAKER_[1-5]$",
+            "description": "Speaker identifier (SPEAKER_1 to SPEAKER_5)"
+          },
+          "speaker_confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Confidence in speaker attribution"
+          }
+        }
+      }
+    },
+    "vocal_features": {
+      "type": "object",
+      "description": "Comprehensive vocal characteristics and metrics.",
+      "properties": {
+        "speech_rate_wpm": {
+          "type": "number",
+          "description": "Words per minute speech rate"
+        },
+        "pause_ratio": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Ratio of silence to speech time"
+        },
+        "emphasis_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Vocal emphasis intensity score"
+        },
+        "pitch_range": {
+          "type": "object",
+          "description": "Pitch characteristics in Hertz",
+          "properties": {
+            "min_hz": { "type": "number" },
+            "max_hz": { "type": "number" },
+            "avg_hz": { "type": "number" }
+          }
+        },
+        "speaker_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Estimated number of distinct speakers"
+        },
+        "clarity_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Audio clarity and intelligibility score"
+        }
+      }
+    },
+    "transcription_metadata": {
+      "type": "object",
+      "description": "Metadata about the transcription process.",
+      "properties": {
+        "processing_time_ms": { "type": "integer" },
+        "model_version": { "type": "string" },
+        "word_count": { "type": "integer" },
+        "audio_duration_sec": { "type": "number" },
+        "noise_level": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Background noise assessment"
+        },
+        "audio_quality": {
+          "type": "string",
+          "enum": ["poor", "fair", "good", "excellent"],
+          "description": "Overall audio quality assessment"
+        }
+      }
+    },
+    "confidence_breakdown": {
+      "type": "object",
+      "description": "Detailed confidence scores per aspect of transcription.",
+      "properties": {
+        "overall": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Overall transcription confidence"
+        },
+        "language_detection": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence in language detection"
+        },
+        "word_accuracy": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Estimated word-level accuracy"
+        },
+        "speaker_separation": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence in speaker diarization"
+        },
+        "timing_accuracy": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence in timestamp accuracy"
+        }
+      }
+    },
+    "quality_scores": {
+      "type": "object",
+      "description": "Comprehensive quality assessment scores.",
+      "properties": {
+        "audio_quality_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Overall audio quality score (0.0-1.0)"
+        },
+        "transcription_confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Overall transcription confidence"
+        },
+        "intelligibility_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Speech intelligibility score"
+        },
+        "recommended_action": {
+          "type": "string",
+          "enum": ["accept", "review", "reject"],
+          "description": "Recommended action based on quality scores"
+        }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 60,
+    "rate_limit": "10/min",
+    "min_audio_duration_seconds": 1,
+    "max_audio_duration_seconds": 3600,
+    "chunk_size_seconds": 300,
+    "supported_languages": ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko"],
+    "transcription_quality_costs": {
+      "fast": "low",
+      "balanced": "medium",
+      "accurate": "high"
+    },
+    "performance_guidelines": {
+      "fast_quality_per_second": 0.1,
+      "balanced_quality_per_second": 0.2,
+      "accurate_quality_per_second": 0.5
+    },
+    "resource_limits": {
+      "memory_mb": 512,
+      "cpu_cores": 1,
+      "gpu_memory_mb": 0,
+      "disk_mb": 500,
+      "max_temp_files": 10
+    }
+  },
+  "error_handling": {
+    "partial_results_on_timeout": true,
+    "max_retries": 1,
+    "fallback_strategies": ["chunked_processing", "lower_quality", "skip_speaker_diarization"],
+    "timeout_warning_threshold_seconds": 50
+  },
+  "security": {
+    "requires_auth": false,
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "audio_retention_policy": "ephemeral",
+    "transcript_retention_policy": "governed",
+    "no_biometric_analysis": true,
+    "max_concurrent_requests": 5,
+    "allowed_path_prefixes": ["skill_media_harvester/", "temp_audio/"]
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "skill_name": "skill_cost_guard",
+  "version": "1.1.0",
+  "description": "Evaluates projected and accumulated execution costs to prevent budget overruns and enforce economic governance.",
+  "inputs": {
+    "task_context": {
+      "type": "object",
+      "required": true,
+      "description": "Contextual information about the task being evaluated.",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^task_[a-zA-Z0-9_]+$",
+          "example": "task_video_analysis_20240315_001"
+        },
+        "campaign_id": {
+          "type": "string",
+          "example": "campaign_q2_social_2024"
+        },
+        "skill_chain": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^skill_[a-zA-Z0-9_]+$"
+          },
+          "example": ["skill_media_harvester", "skill_vocal_analyzer", "skill_content_analyzer"],
+          "description": "Ordered list of skills involved in execution (for cost chain calculation)."
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "critical"],
+          "default": "normal",
+          "description": "Task priority influences cost allowance."
+        }
+      }
+    },
+    "cost_estimate": {
+      "type": "object",
+      "required": true,
+      "description": "Projected cost estimate for the pending action.",
+      "properties": {
+        "compute_units": {
+          "type": "number",
+          "minimum": 0,
+          "example": 2.5
+        },
+        "api_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "example": 3
+        },
+        "estimated_usd": {
+          "type": "number",
+          "minimum": 0,
+          "example": 0.12
+        },
+        "cost_breakdown": {
+          "type": "object",
+          "properties": {
+            "compute_cost": { "type": "number" },
+            "api_cost": { "type": "number" },
+            "storage_cost": { "type": "number" },
+            "model_cost": { "type": "number" }
+          }
+        }
+      }
+    },
+    "budget_context": {
+      "type": "object",
+      "required": true,
+      "description": "Budget constraints and historical usage.",
+      "properties": {
+        "campaign_budget_usd": {
+          "type": "number",
+          "minimum": 0,
+          "example": 1000.0
+        },
+        "spent_to_date_usd": {
+          "type": "number",
+          "minimum": 0,
+          "example": 345.67
+        },
+        "daily_budget_usd": {
+          "type": "number",
+          "minimum": 0,
+          "example": 100.0
+        },
+        "daily_spent_usd": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "hourly_budget_usd": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "hard_stop": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, block when budget exceeded; if false, warn only."
+        },
+        "budget_period": {
+          "type": "string",
+          "enum": ["campaign", "daily", "hourly", "transaction"],
+          "default": "campaign"
+        }
+      }
+    },
+    "risk_tolerance": {
+      "type": "string",
+      "required": false,
+      "enum": ["low", "medium", "high"],
+      "default": "medium",
+      "description": "Controls how aggressively cost overruns are blocked."
+    }
+  },
+  "outputs": {
+    "cost_decision": {
+      "type": "string",
+      "enum": ["allow", "warn", "block"],
+      "description": "Advisory decision based on cost evaluation."
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence in the cost decision."
+    },
+    "cost_summary": {
+      "type": "object",
+      "description": "Summary of cost impact and projections.",
+      "properties": {
+        "estimated_usd": {
+          "type": "number",
+          "description": "Cost of current task"
+        },
+        "projected_total_usd": {
+          "type": "number",
+          "description": "Total projected spend including this task"
+        },
+        "budget_remaining_usd": {
+          "type": "number",
+          "description": "Remaining budget after this task"
+        },
+        "percent_budget_used": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Percentage of budget consumed"
+        },
+        "daily_projection_usd": {
+          "type": "number",
+          "description": "Projected daily spend based on current rate"
+        },
+        "time_to_budget_exhaustion_hours": {
+          "type": "number",
+          "description": "Estimated hours until budget exhausted"
+        },
+        "cost_efficiency_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Cost efficiency score (higher = more efficient)"
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "description": "Cost-related warnings or violations.",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["severity", "message"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "critical"]
+          },
+          "message": {
+            "type": "string",
+            "example": "Daily budget threshold (75%) exceeded"
+          },
+          "threshold_exceeded": {
+            "type": "string",
+            "enum": ["campaign_budget", "daily_budget", "hourly_budget", "cost_per_task"]
+          },
+          "threshold_value": {
+            "type": "number"
+          },
+          "current_value": {
+            "type": "number"
+          },
+          "recommended_action": {
+            "type": "string"
+          },
+          "alert_code": {
+            "type": "string",
+            "pattern": "^COST_[A-Z_]+$"
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Suggested cost optimization actions.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Recommended optimization action"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["immediate", "short_term", "long_term"]
+          },
+          "expected_savings_pct": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "implementation_complexity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "affected_skill": {
+            "type": "string",
+            "pattern": "^skill_[a-zA-Z0-9_]+$"
+          }
+        }
+      }
+    },
+    "cost_metadata": {
+      "type": "object",
+      "description": "Metadata about cost evaluation.",
+      "properties": {
+        "evaluation_time_ms": { "type": "integer" },
+        "pricing_model_version": { "type": "string" },
+        "currency": { "type": "string", "default": "USD" },
+        "exchange_rate_date": { "type": "string" }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 15,
+    "rate_limit": "30/min",
+    "warning_threshold_pct": 0.75,
+    "block_threshold_pct": 0.9,
+    "daily_burst_limit_pct": 0.5,
+    "hourly_rate_limit": 100,
+    "min_task_cost_usd": 0.001,
+    "max_task_cost_usd": 10.0,
+    "cost_variance_tolerance_pct": 0.1,
+    "resource_limits": {
+      "memory_mb": 128,
+      "cpu_cores": 1,
+      "cache_mb": 50
+    },
+    "budget_refresh_intervals": {
+      "daily_reset_utc_hour": 0,
+      "hourly_rollover_minutes": 0,
+      "campaign_start_date": "string",
+      "campaign_end_date": "string"
+    }
+  },
+  "pricing_model": {
+    "description": "Pricing model and cost calculation details.",
+    "skill_costs": {
+      "skill_media_harvester": {
+        "compute_units_per_execution": 0.5,
+        "api_calls_per_execution": 1,
+        "estimated_usd_per_execution": 0.02
+      },
+      "skill_vocal_analyzer": {
+        "compute_units_per_execution": 2.0,
+        "api_calls_per_execution": 0,
+        "estimated_usd_per_execution": 0.05
+      }
+    },
+    "compute_unit_cost_usd": 0.01,
+    "api_call_cost_usd": 0.001,
+    "storage_cost_per_gb_per_month_usd": 0.023,
+    "model_version": "2.1.0",
+    "currency": "USD",
+    "refresh_interval_hours": 24
+  },
+  "error_handling": {
+    "partial_results_allowed": false,
+    "fallback_strategy": "block_on_uncertainty",
+    "confidence_thresholds": {
+      "allow": 0.8,
+      "warn": 0.6,
+      "block": 0.4
+    },
+    "recovery_strategies": [
+      "reduce_execution_scope",
+      "defer_task",
+      "escalate_to_judge",
+      "use_cost_optimized_alternative"
+    ],
+    "financial_safeguards": {
+      "max_cost_overrun_usd": 1.0,
+      "require_reapproval_after_usd": 50.0,
+      "stop_all_on_system_failure": true,
+      "audit_all_block_decisions": true
+    },
+    "retry_policy": {
+      "max_retries": 0,
+      "backoff_ms": 0
+    }
+  },
+  "security": {
+    "requires_auth": false,
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "no_external_billing_calls": true,
+    "audit_logging_required": true,
+    "cost_data_encryption": true,
+    "budget_integrity_checks": true
+  }
+}

@@ -1,0 +1,291 @@
+{
+  "skill_name": "skill_safety_validator",
+  "version": "1.1.0",
+  "description": "Validates analyzed content against safety, compliance, and ethical constraints before publication.",
+  "inputs": {
+    "content": {
+      "type": "string",
+      "required": true,
+      "min_length": 10,
+      "max_length": 20000,
+      "example": "This is the final content ready for publication.",
+      "description": "Final or near-final content to be validated."
+    },
+    "analysis_context": {
+      "type": "object",
+      "required": true,
+      "description": "Structured analysis signals from upstream skills.",
+      "properties": {
+        "topics": {
+          "type": "array",
+          "description": "Topics from skill_content_analyzer"
+        },
+        "themes": {
+          "type": "array",
+          "description": "Themes from skill_content_analyzer"
+        },
+        "sentiment": {
+          "type": "object",
+          "description": "Sentiment analysis from skill_content_analyzer"
+        },
+        "entities": {
+          "type": "array",
+          "description": "Entities from skill_content_analyzer"
+        },
+        "trend_classification": {
+          "type": "object",
+          "description": "Trend classification from skill_trend_classifier"
+        }
+      }
+    },
+    "platform": {
+      "type": "string",
+      "required": false,
+      "enum": ["X", "YouTube", "TikTok", "Instagram", "LinkedIn", "Generic"],
+      "default": "Generic",
+      "example": "X",
+      "description": "Target platform for publication (affects platform-specific rules)."
+    },
+    "risk_profile": {
+      "type": "string",
+      "required": false,
+      "enum": ["low", "medium", "high"],
+      "default": "medium",
+      "example": "medium",
+      "description": "Desired risk tolerance (low=strict, high=lenient)."
+    },
+    "content_type": {
+      "type": "string",
+      "required": false,
+      "enum": ["social_post", "article", "comment", "ad_copy", "video_description"],
+      "default": "social_post",
+      "description": "Type of content for rule application."
+    }
+  },
+  "outputs": {
+    "safety_decision": {
+      "type": "string",
+      "enum": ["pass", "review", "block"],
+      "description": "Non-authoritative safety outcome."
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence in the safety decision."
+    },
+    "safety_score": {
+      "type": "object",
+      "description": "Quantitative safety assessment scores.",
+      "properties": {
+        "overall_safety": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Overall safety score (0=unsafe, 1=safe)"
+        },
+        "toxicity_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Toxicity/hate speech assessment"
+        },
+        "misinformation_risk": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Misinformation risk level"
+        },
+        "platform_compliance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Platform rule compliance score"
+        },
+        "brand_safety": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Brand safety and reputation risk"
+        }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "description": "Detected policy or safety violations.",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["category", "severity", "description"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "hate", "harassment", "misinformation", "violence",
+              "sexual_content", "self_harm", "illegal_activity",
+              "copyright", "platform_policy", "ethical_risk",
+              "brand_safety", "reputational_risk", "legal_compliance"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "description": {
+            "type": "string",
+            "example": "Contains potential misinformation about health claims."
+          },
+          "evidence_excerpt": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "\"This supplement cures all diseases\" - unverified medical claim"
+          },
+          "character_range": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "integer", "minimum": 0 },
+              "end": { "type": "integer" }
+            }
+          },
+          "remediation_suggestion": {
+            "type": "string",
+            "example": "Replace with verified medical information or remove claim."
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Suggested remediation actions (non-binding).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Recommended action to take"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["immediate", "high", "medium", "low"]
+          },
+          "implementation": {
+            "type": "string",
+            "description": "How to implement the recommendation"
+          },
+          "expected_impact": {
+            "type": "string",
+            "enum": ["resolve_violation", "reduce_risk", "improve_compliance"]
+          }
+        }
+      }
+    },
+    "platform_validation": {
+      "type": "object",
+      "description": "Platform-specific validation details.",
+      "properties": {
+        "platform_rules_applied": { "type": "boolean" },
+        "platform_rule_version": { "type": "string" },
+        "platform_specific_violations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "platform_recommendation": {
+          "type": "string",
+          "enum": ["publish", "modify", "reject"],
+          "description": "Platform-specific recommendation"
+        }
+      }
+    },
+    "validation_metadata": {
+      "type": "object",
+      "description": "Metadata about validation process.",
+      "properties": {
+        "processing_time_ms": { "type": "integer" },
+        "model_version": { "type": "string" },
+        "policy_bundle_version": { "type": "string" },
+        "platform_rules_applied": { "type": "boolean" },
+        "risk_profile_applied": { "type": "string" },
+        "validation_coverage": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 25,
+    "rate_limit": "20/min",
+    "min_confidence_threshold": 0.7,
+    "max_violations_reported": 10,
+    "minimum_validation_coverage": 0.95,
+    "platform_rule_refresh_hours": 24,
+    "safety_model_version": "required",
+    "resource_limits": {
+      "memory_mb": 512,
+      "cpu_cores": 1,
+      "model_cache_mb": 200
+    },
+    "audit_trail_requirements": {
+      "store_decision": true,
+      "store_violations": true,
+      "store_confidence": true,
+      "retention_days": 90
+    }
+  },
+  "validation_rules": {
+    "description": "Rules and policies applied during validation.",
+    "safety_policies": [
+      "no_hate_speech",
+      "no_harassment",
+      "no_misinformation",
+      "no_violence_incitement",
+      "no_self_harm_promotion"
+    ],
+    "compliance_policies": [
+      "copyright_respect",
+      "platform_terms",
+      "legal_requirements",
+      "ethical_guidelines"
+    ],
+    "brand_safety_policies": [
+      "reputation_protection",
+      "association_risk",
+      "contextual_appropriateness"
+    ],
+    "policy_bundle_version": "2.1.0"
+  },
+  "error_handling": {
+    "partial_results_allowed": false,
+    "fallback_strategy": "block_on_uncertainty",
+    "confidence_thresholds": {
+      "pass": 0.8,
+      "review": 0.6,
+      "block": 0.4
+    },
+    "recovery_strategies": [
+      "simplify_content",
+      "remove_flagged_sections",
+      "escalate_to_judge",
+      "request_human_review"
+    ],
+    "safety_fallbacks": {
+      "on_timeout": "block",
+      "on_model_failure": "escalate",
+      "on_rule_parse_error": "review",
+      "on_confidence_below_threshold": "escalate"
+    },
+    "max_escalations_per_hour": 10
+  },
+  "security": {
+    "requires_auth": false,
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "no_external_lookups": true,
+    "content_retention": "ephemeral",
+    "audit_logging_required": true,
+    "model_integrity_check": true,
+    "rule_signature_verification": true
+  }
+} 

@@ -1,0 +1,947 @@
+{
+  "skill_name": "skill_workflow_orchestrator",
+  "version": "3.0.0",
+  "description": "Governed workflow orchestration system that coordinates, sequences, and supervises multi-skill execution pipelines. Manages complex dependencies, conditional branching, retry logic, resource allocation, cost tracking, and compliance enforcement while maintaining strict audit trails and human oversight escalation paths.",
+  "inputs": {
+    "workflow_definition": {
+      "type": "object",
+      "required": true,
+      "description": "Declarative workflow specification defining steps, dependencies, constraints, and governance rules.",
+      "properties": {
+        "workflow_id": {
+          "type": "string",
+          "pattern": "^wf_[a-zA-Z0-9_]{16}$",
+          "example": "wf_content_pipeline_20250206_001",
+          "description": "Globally unique workflow identifier for audit and tracking."
+        },
+        "workflow_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "example": "2.1.0",
+          "description": "Semantic version of workflow definition for compatibility."
+        },
+        "objective": {
+          "type": "string",
+          "min_length": 10,
+          "max_length": 500,
+          "example": "Process YouTube video → transcribe → analyze → safety check → publish to LinkedIn",
+          "description": "Human-readable purpose and expected outcome."
+        },
+        "workflow_type": {
+          "type": "string",
+          "enum": ["linear", "parallel", "conditional", "looping", "hybrid"],
+          "default": "linear",
+          "description": "Top-level execution pattern for optimization."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "description": "Sequenced or parallel workflow steps with dependencies.",
+          "items": {
+            "type": "object",
+            "required": ["step_id", "skill", "inputs"],
+            "properties": {
+              "step_id": {
+                "type": "string",
+                "pattern": "^step_[a-zA-Z0-9_]+$",
+                "example": "step_download_video"
+              },
+              "step_name": {
+                "type": "string",
+                "example": "Download Source Video"
+              },
+              "skill": {
+                "type": "string",
+                "pattern": "^skill_[a-zA-Z0-9_]+$",
+                "example": "skill_media_harvester",
+                "description": "Target skill to invoke (must be registered and enabled)."
+              },
+              "skill_version_constraint": {
+                "type": "string",
+                "pattern": "^(\\d+\\.\\d+\\.\\d+|\\^\\d+\\.\\d+\\.\\d+|latest)$",
+                "example": "^2.0.0",
+                "description": "Semver constraint for skill version compatibility."
+              },
+              "inputs": {
+                "type": "object",
+                "description": "Skill-specific inputs (validated against skill contract)."
+              },
+              "input_templates": {
+                "type": "object",
+                "description": "Template expressions referencing previous step outputs.",
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^\\{\\{[a-zA-Z0-9_\\.]+\\}\\}$"
+                },
+                "example": {
+                  "audio_path": "{{step_download_video.output.local_path}}"
+                }
+              },
+              "depends_on": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^step_[a-zA-Z0-9_]+$"
+                },
+                "description": "Step IDs that must complete successfully before this step."
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600,
+                "default": 60
+              },
+              "retry_policy": {
+                "type": "object",
+                "properties": {
+                  "max_retries": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5,
+                    "default": 2
+                  },
+                  "retry_on": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["timeout", "validation_error", "execution_error", "resource_unavailable", "rate_limit", "low_confidence"]
+                    },
+                    "default": ["timeout", "execution_error"]
+                  },
+                  "backoff_strategy": {
+                    "type": "string",
+                    "enum": ["none", "linear", "exponential", "fibonacci"],
+                    "default": "exponential"
+                  },
+                  "backoff_base_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60,
+                    "default": 2
+                  },
+                  "max_backoff_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 300,
+                    "default": 60
+                  }
+                }
+              },
+              "failure_behavior": {
+                "type": "string",
+                "enum": ["fail_fast", "continue", "continue_with_condition", "escalate", "skip"],
+                "default": "escalate"
+              },
+              "failure_condition": {
+                "type": "object",
+                "description": "Conditional logic for failure handling.",
+                "properties": {
+                  "max_consecutive_failures": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "allow_partial_success": {
+                    "type": "boolean"
+                  },
+                  "on_failure_output": {
+                    "type": "object",
+                    "description": "Default output to propagate on failure."
+                  }
+                }
+              },
+              "condition": {
+                "type": "object",
+                "description": "Conditional execution based on previous outputs.",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["always", "if", "unless", "switch"]
+                  },
+                  "expression": {
+                    "type": "string",
+                    "description": "JavaScript-like condition using previous outputs."
+                  },
+                  "cases": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "match": { "type": "string" },
+                        "execute": { "type": "boolean" }
+                      }
+                    }
+                  }
+                }
+              },
+              "resource_requirements": {
+                "type": "object",
+                "properties": {
+                  "memory_mb": {
+                    "type": "integer",
+                    "minimum": 64,
+                    "maximum": 8192,
+                    "default": 512
+                  },
+                  "cpu_cores": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 8.0,
+                    "default": 1.0
+                  },
+                  "gpu_required": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "network_access": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              },
+              "cost_estimate_usd": {
+                "type": "number",
+                "minimum": 0.0,
+                "description": "Estimated cost for this step (for budgeting)."
+              },
+              "confidence_threshold": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "default": 0.7
+              },
+              "approval_required": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether step requires explicit Judge/HITL approval before execution."
+              },
+              "tags": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Metadata tags for monitoring and analytics."
+              }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "object",
+          "description": "Skill and resource dependencies required for workflow.",
+          "properties": {
+            "required_skills": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^skill_[a-zA-Z0-9_]+$"
+              }
+            },
+            "min_skill_versions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+$"
+              }
+            },
+            "external_services": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "External services required (e.g., 'youtube_api', 'openai_api')."
+            },
+            "data_sources": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "description": "Global workflow execution constraints.",
+          "properties": {
+            "max_total_time_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400,
+              "default": 3600
+            },
+            "max_total_cost_usd": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1000.0
+            },
+            "max_concurrent_steps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 3
+            },
+            "allowed_execution_times": {
+              "type": "object",
+              "properties": {
+                "time_windows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "start_hour": { "type": "integer", "minimum": 0, "maximum": 23 },
+                      "end_hour": { "type": "integer", "minimum": 0, "maximum": 23 }
+                    }
+                  }
+                },
+                "days_of_week": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                  }
+                }
+              }
+            },
+            "rate_limits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^\\d+\\/(sec|min|hour|day)$"
+              }
+            },
+            "data_retention": {
+              "type": "object",
+              "properties": {
+                "intermediate_data_days": { "type": "integer", "minimum": 1, "maximum": 90 },
+                "final_output_days": { "type": "integer", "minimum": 1, "maximum": 365 }
+              }
+            }
+          }
+        },
+        "error_handling": {
+          "type": "object",
+          "description": "Global error handling and escalation policies.",
+          "properties": {
+            "global_failure_behavior": {
+              "type": "string",
+              "enum": ["fail_fast", "continue_on_error", "pause_and_escalate"],
+              "default": "pause_and_escalate"
+            },
+            "escalation_path": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["judge", "hitl", "governance", "security", "operations"]
+              },
+              "default": ["judge", "hitl"]
+            },
+            "auto_retry_on": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Error types that trigger automatic retry."
+            },
+            "notification_channels": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Channels for failure notifications (e.g., 'slops', 'email_alert')."
+            }
+          }
+        },
+        "monitoring": {
+          "type": "object",
+          "description": "Monitoring and observability configuration.",
+          "properties": {
+            "metrics_enabled": { "type": "boolean", "default": true },
+            "logging_level": {
+              "type": "string",
+              "enum": ["debug", "info", "warn", "error"],
+              "default": "info"
+            },
+            "checkpoints": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Step IDs where checkpoints should be created."
+            },
+            "alert_thresholds": {
+              "type": "object",
+              "properties": {
+                "time_exceeded_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+                "cost_exceeded_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+                "error_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+              }
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "description": "Audit trail and compliance requirements.",
+          "properties": {
+            "record_inputs": { "type": "boolean", "default": true },
+            "record_outputs": { "type": "boolean", "default": true },
+            "record_intermediate": { "type": "boolean", "default": false },
+            "encryption_required": { "type": "boolean", "default": true },
+            "compliance_tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Compliance categories (e.g., 'gdpr', 'hipaa', 'pci')."
+            }
+          }
+        }
+      }
+    },
+    "execution_context": {
+      "type": "object",
+      "required": true,
+      "description": "Runtime context, constraints, and governance directives.",
+      "properties": {
+        "execution_mode": {
+          "type": "string",
+          "enum": ["execute", "validate_only", "dry_run", "estimate_only"],
+          "default": "execute",
+          "description": "Controls whether workflow actually executes skills."
+        },
+        "initiator": {
+          "type": "string",
+          "enum": ["planner", "judge", "hitl", "system", "api", "scheduler"],
+          "default": "planner",
+          "description": "Who/what initiated this workflow execution."
+        },
+        "initiator_id": {
+          "type": "string",
+          "description": "Identifier of the initiating component/user."
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "critical", "emergency"],
+          "default": "normal"
+        },
+        "time_budget_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "description": "Maximum total execution time before forced termination."
+        },
+        "cost_budget_usd": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1000.0,
+          "description": "Maximum allowed cost before forced termination."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.7,
+          "description": "Minimum confidence for steps to be considered successful."
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production", "sandbox"],
+          "default": "production"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Multi-tenant isolation identifier."
+        },
+        "trace_id": {
+          "type": "string",
+          "description": "Distributed tracing identifier for observability."
+        },
+        "parent_execution_id": {
+          "type": "string",
+          "description": "For nested/sub-workflows."
+        },
+        "override_permissions": {
+          "type": "object",
+          "description": "Temporary permission overrides (requires authorization).",
+          "properties": {
+            "allow_cost_exceed": { "type": "boolean", "default": false },
+            "allow_time_exceed": { "type": "boolean", "default": false },
+            "skip_approvals": { "type": "boolean", "default": false },
+            "force_execution": { "type": "boolean", "default": false }
+          }
+        },
+        "callback_urls": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "string", "format": "uri" },
+            "failure": { "type": "string", "format": "uri" },
+            "progress": { "type": "string", "format": "uri" }
+          },
+          "description": "Webhook URLs for asynchronous notifications."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional context metadata for audit and debugging."
+        }
+      }
+    },
+    "state_input": {
+      "type": "object",
+      "required": false,
+      "description": "Optional persisted state for workflow resumption or continuation.",
+      "properties": {
+        "previous_execution_id": { "type": "string" },
+        "checkpoint_id": { "type": "string" },
+        "completed_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "step_outputs": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "accumulated_cost_usd": { "type": "number" },
+        "elapsed_time_seconds": { "type": "integer" }
+      }
+    }
+  },
+  "outputs": {
+    "workflow_result": {
+      "type": "object",
+      "required": true,
+      "description": "Comprehensive workflow execution outcome with all details.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["completed", "completed_with_warnings", "partial_success", "failed", "blocked", "escalated", "terminated", "cancelled", "timed_out"],
+          "description": "Overall workflow execution status."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable summary of execution outcome."
+        },
+        "final_output": {
+          "type": "object",
+          "description": "Aggregated output from final workflow step(s)."
+        },
+        "completed_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "failed_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "skipped_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "escalations": {
+          "type": "array",
+          "description": "All escalations that occurred during execution.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step_id": { "type": "string" },
+              "escalation_id": { "type": "string", "pattern": "^esc_[a-zA-Z0-9_]+$" },
+              "reason": { "type": "string" },
+              "reason_code": {
+                "type": "string",
+                "enum": ["timeout", "validation_error", "execution_error", "policy_violation", "cost_exceeded", "confidence_low", "resource_unavailable", "dependency_failed", "manual_intervention"]
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "resolution": {
+                "type": "string",
+                "enum": ["pending", "approved", "rejected", "overridden", "resolved"]
+              },
+              "resolution_notes": { "type": "string" }
+            }
+          }
+        },
+        "confidence_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Overall confidence in workflow execution quality."
+        },
+        "cost_summary": {
+          "type": "object",
+          "properties": {
+            "total_cost_usd": { "type": "number", "minimum": 0.0 },
+            "cost_by_step": {
+              "type": "object",
+              "additionalProperties": { "type": "number" }
+            },
+            "budget_used_percent": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+            "cost_breakdown": {
+              "type": "object",
+              "properties": {
+                "compute": { "type": "number" },
+                "external_apis": { "type": "number" },
+                "storage": { "type": "number" },
+                "network": { "type": "number" }
+              }
+            }
+          }
+        },
+        "performance_metrics": {
+          "type": "object",
+          "properties": {
+            "total_execution_time_seconds": { "type": "number" },
+            "average_step_time_seconds": { "type": "number" },
+            "slowest_step_id": { "type": "string" },
+            "slowest_step_time_seconds": { "type": "number" },
+            "parallelism_utilization": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "resource_utilization": {
+              "type": "object",
+              "properties": {
+                "cpu_percent": { "type": "number" },
+                "memory_mb": { "type": "number" },
+                "peak_memory_mb": { "type": "number" }
+              }
+            }
+          }
+        },
+        "quality_indicators": {
+          "type": "object",
+          "properties": {
+            "success_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "retry_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "escalation_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "confidence_distribution": {
+              "type": "object",
+              "properties": {
+                "min": { "type": "number" },
+                "max": { "type": "number" },
+                "mean": { "type": "number" },
+                "median": { "type": "number" }
+              }
+            },
+            "policy_compliance_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+          }
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": ["retry", "escalate", "continue_from_checkpoint", "rollback", "cleanup", "notify", "archive"]
+              },
+              "target": { "type": "string" },
+              "reason": { "type": "string" },
+              "priority": { "type": "string" }
+            }
+          },
+          "description": "Recommended next actions based on execution outcome."
+        }
+      }
+    },
+    "workflow_state": {
+      "type": "object",
+      "required": false,
+      "description": "Checkpointed state for workflow resumption or continuation.",
+      "properties": {
+        "checkpoint_id": { "type": "string", "pattern": "^chk_[a-zA-Z0-9_]+$" },
+        "completed_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pending_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "step_outputs": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "accumulated_cost_usd": { "type": "number", "minimum": 0.0 },
+        "elapsed_time_seconds": { "type": "integer", "minimum": 0 },
+        "next_step_id": { "type": "string" },
+        "state_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "workflow_metadata": {
+      "type": "object",
+      "required": true,
+      "description": "Comprehensive metadata for audit, monitoring, and debugging.",
+      "properties": {
+        "execution_id": {
+          "type": "string",
+          "pattern": "^exec_[a-zA-Z0-9_]{16}$",
+          "example": "exec_20250206_abc123xyz789"
+        },
+        "workflow_id": { "type": "string" },
+        "workflow_version": { "type": "string" },
+        "start_time": { "type": "string", "format": "date-time" },
+        "end_time": { "type": "string", "format": "date-time" },
+        "processing_time_ms": { "type": "integer", "minimum": 0 },
+        "initiator": { "type": "string" },
+        "priority": { "type": "string" },
+        "environment": { "type": "string" },
+        "resource_usage": {
+          "type": "object",
+          "properties": {
+            "cpu_percent_avg": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+            "cpu_percent_peak": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+            "memory_mb_avg": { "type": "number", "minimum": 0.0 },
+            "memory_mb_peak": { "type": "number", "minimum": 0.0 },
+            "disk_mb_used": { "type": "number", "minimum": 0.0 },
+            "network_mb_transferred": { "type": "number", "minimum": 0.0 }
+          }
+        },
+        "step_execution_details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step_id": { "type": "string" },
+              "skill": { "type": "string" },
+              "status": { "type": "string" },
+              "start_time": { "type": "string", "format": "date-time" },
+              "end_time": { "type": "string", "format": "date-time" },
+              "duration_ms": { "type": "integer" },
+              "retry_count": { "type": "integer", "minimum": 0 },
+              "confidence_score": { "type": "number" },
+              "cost_usd": { "type": "number" },
+              "error_message": { "type": "string" },
+              "output_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        },
+        "dependency_graph": {
+          "type": "object",
+          "properties": {
+            "nodes": { "type": "array", "items": { "type": "string" } },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": { "type": "string" },
+                  "to": { "type": "string" },
+                  "type": { "type": "string" }
+                }
+              }
+            },
+            "execution_order": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "audit_trail": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": { "type": "string", "format": "date-time" },
+              "event": { "type": "string" },
+              "step_id": { "type": "string" },
+              "details": { "type": "object" }
+            }
+          }
+        },
+        "quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["cost_overrun_warning", "time_overrun_warning", "high_escalation_rate", "low_confidence_output", "resource_constraint", "dependency_warning", "policy_warning"]
+          }
+        },
+        "compliance_info": {
+          "type": "object",
+          "properties": {
+            "data_classification": { "type": "string" },
+            "encryption_applied": { "type": "boolean" },
+            "pii_processed": { "type": "boolean" },
+            "compliance_tags": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "execution_plan": {
+      "type": "object",
+      "required": false,
+      "description": "Generated execution plan (for dry_run or validate_only modes).",
+      "properties": {
+        "estimated_cost_usd": { "type": "number" },
+        "estimated_time_seconds": { "type": "number" },
+        "critical_path": { "type": "array", "items": { "type": "string" } },
+        "resource_requirements": {
+          "type": "object",
+          "properties": {
+            "peak_memory_mb": { "type": "number" },
+            "peak_cpu_cores": { "type": "number" },
+            "concurrent_skills": { "type": "integer" }
+          }
+        },
+        "risk_assessment": {
+          "type": "object",
+          "properties": {
+            "high_risk_steps": { "type": "array", "items": { "type": "string" } },
+            "bottlenecks": { "type": "array", "items": { "type": "string" } },
+            "single_points_of_failure": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "validation_warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step_id": { "type": "string" },
+              "warning": { "type": "string" },
+              "severity": { "type": "string" }
+            }
+          }
+        },
+        "recommendations": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "constraints": {
+    "max_steps": 100,
+    "max_execution_time_seconds": 86400,
+    "max_total_cost_usd": 1000.0,
+    "rate_limit": "5/min",
+    "concurrent_workflows": 3,
+    "max_concurrent_steps": 10,
+    "max_workflow_depth": 5,
+    "max_state_size_mb": 100,
+    "external_calls_allowed": false,
+    "max_retries_per_step": 5,
+    "max_escalations_per_workflow": 10,
+    "resource_limits": {
+      "memory_mb": 4096,
+      "cpu_cores": 4,
+      "disk_mb": 1024,
+      "network_mbps": 100
+    },
+    "data_retention": {
+      "execution_metadata_days": 180,
+      "step_outputs_days": 30,
+      "audit_logs_days": 365,
+      "state_checkpoints_days": 7
+    },
+    "compliance_requirements": [
+      "audit_trail_complete",
+      "encryption_enabled",
+      "access_logging",
+      "data_classification_enforced"
+    ]
+  },
+  "quality_gates": {
+    "min_workflow_confidence": 0.6,
+    "max_time_overrun_percent": 20.0,
+    "max_cost_overrun_percent": 15.0,
+    "max_escalation_rate": 0.3,
+    "min_step_success_rate": 0.8,
+    "max_retry_rate": 0.4,
+    "performance_targets": {
+      "p95_execution_time_seconds": 300,
+      "p99_step_success_rate": 0.95,
+      "average_cost_efficiency": 0.85
+    }
+  },
+  "error_handling": {
+    "partial_results_allowed": true,
+    "state_persistence_required": true,
+    "fallback_strategies": {
+      "timeout": "escalate_and_pause",
+      "cost_exceeded": "pause_and_escalate",
+      "skill_unavailable": "skip_or_escalate",
+      "validation_error": "fail_fast",
+      "resource_exhaustion": "degrade_and_continue"
+    },
+    "recovery_modes": {
+      "automatic_retry": {
+        "enabled": true,
+        "max_attempts": 3,
+        "backoff_base_seconds": 2
+      },
+      "checkpoint_resume": {
+        "enabled": true,
+        "checkpoint_interval_steps": 5,
+        "max_checkpoints": 10
+      },
+      "graceful_degradation": {
+        "enabled": true,
+        "levels": ["full", "essential", "minimal", "failed"]
+      }
+    },
+    "escalation_paths": {
+      "low_severity": ["judge"],
+      "medium_severity": ["judge", "hitl"],
+      "high_severity": ["judge", "hitl", "governance"],
+      "critical_severity": ["judge", "hitl", "governance", "security", "operations"]
+    },
+    "notification_policies": {
+      "on_escalation": true,
+      "on_completion": true,
+      "on_cost_warning": true,
+      "on_time_warning": true,
+      "on_critical_failure": true
+    }
+  },
+  "security": {
+    "requires_auth": true,
+    "auth_method": "jwt",
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "audit_logging_required": true,
+    "input_validation": true,
+    "output_validation": true,
+    "encryption_required": true,
+    "rate_limiting_enforced": true,
+    "access_control": {
+      "execute": ["planner", "judge", "hitl", "system"],
+      "read": ["planner", "judge", "hitl", "governance", "auditor"],
+      "write": ["governance", "system_admin"],
+      "admin": ["system_admin"]
+    },
+    "compliance": {
+      "gdpr_compliant": true,
+      "data_minimization": true,
+      "pii_handling": "redact_or_reject",
+      "secrets_handling": "never_store"
+    }
+  },
+  "audit_requirements": {
+    "mandatory_fields": ["execution_id", "workflow_id", "workflow_version", "status", "confidence_score", "initiator", "start_time", "end_time"],
+    "retention_period_days": 180,
+    "encryption_required": true,
+    "access_logging": true,
+    "change_tracking": true,
+    "integrity_checks": true,
+    "compliance_checks": ["gdpr_compliant", "audit_trail_complete", "policy_enforced", "access_controlled"]
+  },
+  "performance_targets": {
+    "p95_processing_time_ms": 10000,
+    "p99_latency_seconds": 600,
+    "throughput_workflows_per_minute": 5,
+    "availability_target": 0.995,
+    "error_rate_target": 0.01,
+    "cost_efficiency_target": 0.9
+  },
+  "monitoring": {
+    "metrics": ["execution_time", "success_rate", "cost_per_workflow", "escalation_rate", "resource_utilization"],
+    "alerts": ["cost_exceeded", "time_exceeded", "high_error_rate", "low_confidence", "resource_exhaustion"],
+    "health_checks": ["skill_availability", "resource_availability", "policy_validity", "state_storage"],
+    "sla_targets": {
+      "execution_time_seconds": 3600,
+      "success_rate": 0.95,
+      "escalation_response_minutes": 60
+    }
+  },
+  "lifecycle": {
+    "versioning": {
+      "skill_version": "3.0.0",
+      "contract_version": "3.0.0",
+      "backward_compatible": false,
+      "deprecation_schedule_days": 90
+    },
+    "maintenance": {
+      "model_retraining_cycle_days": 30,
+      "policy_review_cycle_days": 90,
+      "performance_review_cycle_days": 30,
+      "security_audit_cycle_days": 180
+    },
+    "scaling": {
+      "max_instances": 10,
+      "auto_scaling": true,
+      "scale_up_threshold": 0.8,
+      "scale_down_threshold": 0.3
+    }
+  }
+}

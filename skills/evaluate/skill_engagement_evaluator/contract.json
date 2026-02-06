@@ -1,0 +1,810 @@
+{
+  "skill_name": "skill_engagement_evaluator",
+  "version": "2.0.0",
+  "description": "Evaluates predicted or observed engagement performance of persona-published content across multiple dimensions. Generates actionable insights, benchmarks, and learning feedback without modifying content or execution.",
+  "inputs": {
+    "content": {
+      "type": "string",
+      "required": true,
+      "min_length": 10,
+      "max_length": 10000,
+      "description": "Persona-aligned content to be evaluated for engagement potential or performance.",
+      "example": "AI governance requires transparent frameworks and multi-stakeholder collaboration. Let's discuss: what principles matter most?"
+    },
+    "content_features": {
+      "type": "object",
+      "required": false,
+      "description": "Optional pre-extracted content features to accelerate evaluation.",
+      "properties": {
+        "character_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hashtag_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "emoji_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "question_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sentiment_score": {
+          "type": "number",
+          "minimum": -1.0,
+          "maximum": 1.0
+        },
+        "readability_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "keyword_density": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "platform": {
+      "type": "string",
+      "required": true,
+      "enum": ["X", "LinkedIn", "Instagram", "TikTok", "YouTube", "Bluesky", "Mastodon", "Generic"],
+      "example": "LinkedIn",
+      "description": "Platform context used for engagement modeling and benchmarking."
+    },
+    "evaluation_mode": {
+      "type": "string",
+      "required": false,
+      "enum": ["predictive", "observed", "comparative"],
+      "default": "predictive",
+      "description": "Predictive = pre-publish estimation; Observed = post-publish analysis; Comparative = A/B test evaluation."
+    },
+    "observed_metrics": {
+      "type": "object",
+      "required": false,
+      "description": "Actual engagement metrics (required for observed mode).",
+      "properties": {
+        "impressions": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of times content was displayed."
+        },
+        "reach": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unique users who saw the content."
+        },
+        "likes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Positive reactions (likes, hearts, etc.)."
+        },
+        "comments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "User comments or replies."
+        },
+        "shares": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Reshares, retweets, reposts."
+        },
+        "saves": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bookmarks or saves."
+        },
+        "clicks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Link clicks or content expansions."
+        },
+        "watch_time_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total watch time for video content."
+        },
+        "completion_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Percentage of content consumed (video/article)."
+        },
+        "engagement_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "description": "Engagements per impression (if available)."
+        },
+        "metrics_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When metrics were collected."
+        },
+        "collection_duration_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 720,
+          "description": "Hours over which metrics were collected (1-30 days)."
+        },
+        "audience_retention": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "description": "Audience retention curve for video content."
+        }
+      }
+    },
+    "persona_context": {
+      "type": "object",
+      "required": false,
+      "description": "Persona metadata for comparative performance analysis.",
+      "properties": {
+        "persona_id": {
+          "type": "string",
+          "pattern": "^persona_[a-zA-Z0-9_]+$",
+          "example": "persona_tech_thought_leader"
+        },
+        "persona_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "example": "2.1.0"
+        },
+        "target_audience": {
+          "type": "string",
+          "enum": ["general", "technical", "business", "consumer", "enthusiast", "academic"]
+        },
+        "voice": {
+          "type": "string",
+          "enum": ["authoritative", "playful", "analytical", "conversational", "provocative"]
+        }
+      }
+    },
+    "temporal_context": {
+      "type": "object",
+      "required": false,
+      "description": "Timing context for engagement evaluation.",
+      "properties": {
+        "publish_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When content was/will be published."
+        },
+        "audience_timezone": {
+          "type": "string",
+          "description": "Primary audience timezone (e.g., 'America/New_York')."
+        },
+        "day_of_week": {
+          "type": "string",
+          "enum": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        },
+        "hour_of_day": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23
+        },
+        "seasonal_context": {
+          "type": "string",
+          "enum": ["normal", "holiday", "event", "crisis", "trending_topic"]
+        }
+      }
+    },
+    "historical_baseline": {
+      "type": "object",
+      "required": false,
+      "description": "Optional baseline metrics for comparison.",
+      "properties": {
+        "avg_engagement_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "avg_click_through_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "avg_completion_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "time_period": {
+          "type": "string",
+          "enum": ["7d", "30d", "90d", "365d", "all_time"]
+        },
+        "baseline_confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "testing_context": {
+      "type": "object",
+      "required": false,
+      "description": "Context for A/B or multivariate testing analysis.",
+      "properties": {
+        "test_id": {
+          "type": "string",
+          "pattern": "^test_[a-zA-Z0-9_]+$"
+        },
+        "variant_id": {
+          "type": "string"
+        },
+        "control_metrics": {
+          "type": "object",
+          "properties": {
+            "engagement_score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "sample_size": {
+              "type": "integer",
+              "minimum": 10
+            },
+            "confidence_interval": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "test_objective": {
+          "type": "string",
+          "enum": ["engagement", "conversion", "retention", "awareness", "sentiment"]
+        },
+        "minimum_detectable_effect": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "statistical_power": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": false,
+      "description": "Content provenance for audit and learning.",
+      "properties": {
+        "source_skill": {
+          "type": "string",
+          "example": "skill_persona_publisher"
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generation_id": {
+          "type": "string"
+        },
+        "workflow_id": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "outputs": {
+    "engagement_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall normalized engagement score (0-1 scale)."
+    },
+    "engagement_breakdown": {
+      "type": "object",
+      "description": "Component-level engagement signals with confidence intervals.",
+      "properties": {
+        "attention_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Likelihood to capture initial attention (hook effectiveness)."
+        },
+        "interaction_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Likelihood to generate direct interactions (comments, replies)."
+        },
+        "amplification_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Likelihood to be shared/amplified (virality potential)."
+        },
+        "retention_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Likelihood to retain attention over time (stickiness)."
+        },
+        "conversion_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Likelihood to drive desired actions (clicks, follows, saves)."
+        },
+        "emotional_resonance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Estimated emotional impact and memorability."
+        },
+        "score_confidence": {
+          "type": "object",
+          "description": "Confidence levels for each score component.",
+          "properties": {
+            "attention": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "interaction": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "amplification": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "retention": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "conversion": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "emotional_resonance": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        }
+      }
+    },
+    "benchmark_comparison": {
+      "type": "object",
+      "description": "Multi-dimensional comparison against relevant benchmarks.",
+      "properties": {
+        "platform_baseline": {
+          "type": "object",
+          "properties": {
+            "avg_engagement_rate": {
+              "type": "number",
+              "minimum": 0.0
+            },
+            "percentile": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "platform_avg_score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "persona_baseline": {
+          "type": "object",
+          "properties": {
+            "persona_avg_score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "persona_percentile": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "similar_content_avg": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "temporal_baseline": {
+          "type": "object",
+          "properties": {
+            "time_slot_avg": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "time_adjusted_score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "optimal_timing_score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "relative_performance": {
+          "type": "string",
+          "enum": ["poor", "below_average", "average", "above_average", "excellent", "outstanding"]
+        },
+        "percent_delta": {
+          "type": "number",
+          "minimum": -1.0,
+          "maximum": 2.0
+        },
+        "statistical_significance": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "very_high"],
+          "description": "Confidence in comparison validity."
+        },
+        "key_differentiators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Factors driving performance difference from baseline."
+        }
+      }
+    },
+    "insights": {
+      "type": "array",
+      "description": "Evidence-backed engagement insights with actionable context.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["hook", "clarity", "tone", "timing", "format", "platform_fit", "audience_match", "competitiveness", "novelty", "emotional_resonance", "call_to_action", "hashtag_strategy"]
+          },
+          "observation": {
+            "type": "string",
+            "description": "What was observed about engagement potential."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Supporting evidence or data points."
+          },
+          "impact_level": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "certainty": {
+            "type": "string",
+            "enum": ["speculative", "likely", "confident", "certain"]
+          },
+          "insight_id": {
+            "type": "string",
+            "pattern": "^insight_[a-zA-Z0-9_]+$"
+          },
+          "related_features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Actionable, prioritized recommendations for content improvement.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "suggestion": {
+            "type": "string",
+            "description": "Specific improvement suggestion."
+          },
+          "expected_impact": {
+            "type": "string",
+            "enum": ["incremental", "moderate", "significant", "transformative"]
+          },
+          "applicable_stage": {
+            "type": "string",
+            "enum": ["planning", "persona", "formatting", "timing", "distribution", "all"]
+          },
+          "implementation_effort": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "recommendation_id": {
+            "type": "string",
+            "pattern": "^rec_[a-zA-Z0-9_]+$"
+          }
+        }
+      }
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall confidence in evaluation accuracy and completeness."
+    },
+    "learning_loop": {
+      "type": "object",
+      "description": "Data to feed back into model learning and improvement systems.",
+      "properties": {
+        "prediction_accuracy": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "How accurate predictive mode was compared to observed (observed mode only)."
+        },
+        "model_gap_analysis": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Specific areas where model predictions diverged from reality."
+        },
+        "feature_importance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "description": "Which content features most influenced actual engagement."
+        },
+        "recommended_model_updates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Suggested improvements to prediction models."
+        },
+        "data_quality_insights": {
+          "type": "object",
+          "properties": {
+            "missing_features": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "uncertainty_sources": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "confidence_calibration": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        }
+      }
+    },
+    "evaluation_metadata": {
+      "type": "object",
+      "description": "Comprehensive metadata about the evaluation process for audit and optimization.",
+      "properties": {
+        "evaluation_id": {
+          "type": "string",
+          "pattern": "^eval_[a-zA-Z0-9_]+$"
+        },
+        "processing_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_version": {
+          "type": "string"
+        },
+        "evaluation_mode": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "model_confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Model's self-assessment of prediction quality."
+        },
+        "data_freshness_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Age of training data used for predictions."
+        },
+        "platform_model_version": {
+          "type": "string",
+          "description": "Platform-specific model version."
+        },
+        "cache_status": {
+          "type": "string",
+          "enum": ["hit", "miss", "partial", "stale"]
+        },
+        "resource_usage": {
+          "type": "object",
+          "properties": {
+            "memory_mb": {
+              "type": "number"
+            },
+            "cpu_percent": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 100.0
+            }
+          }
+        },
+        "quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Flags indicating potential quality issues in evaluation."
+        }
+      }
+    },
+    "risk_assessment": {
+      "type": "object",
+      "description": "Risk analysis for engagement predictions.",
+      "properties": {
+        "volatility_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Uncertainty/variability in predicted outcomes."
+        },
+        "downside_risk": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Probability of significantly underperforming expectations."
+        },
+        "upside_potential": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Probability of significantly exceeding expectations."
+        },
+        "risk_factors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "risk_mitigations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 15,
+    "rate_limit": "30/min",
+    "min_confidence_threshold": 0.6,
+    "max_content_length_chars": 10000,
+    "supported_evaluation_modes": ["predictive", "observed", "comparative"],
+    "minimum_sample_size_baseline": 10,
+    "max_insights_per_evaluation": 10,
+    "max_recommendations_per_evaluation": 5,
+    "resource_limits": {
+      "memory_mb": 512,
+      "cpu_cores": 2,
+      "disk_mb": 100,
+      "network_requests": 0
+    },
+    "data_retention": {
+      "evaluation_results_days": 90,
+      "learning_data_days": 365,
+      "audit_logs_days": 180
+    }
+  },
+  "quality_gates": {
+    "min_overall_confidence": 0.6,
+    "min_model_confidence": 0.7,
+    "max_processing_time_ms": 15000,
+    "required_output_fields": ["engagement_score", "confidence_score", "evaluation_metadata"],
+    "insight_quality_threshold": 0.5,
+    "recommendation_quality_threshold": 0.6
+  },
+  "error_handling": {
+    "partial_results_allowed": true,
+    "fallback_strategy": "return_low_confidence_with_explanation",
+    "fallback_options": {
+      "simplify_evaluation": {
+        "max_insights": 3,
+        "skip_baseline": true,
+        "confidence_adjustment": -0.2
+      },
+      "ignore_baseline": true,
+      "escalation_threshold": 0.4,
+      "minimum_viable_output": {
+        "engagement_score": true,
+        "confidence_score": true,
+        "evaluation_metadata": true
+      }
+    },
+    "recovery_strategies": ["simplify_evaluation", "ignore_baseline", "use_platform_defaults", "fallback_to_rule_based", "escalate_to_judge"],
+    "degradation_modes": {
+      "full_analysis": {
+        "requires": ["model_available", "baseline_data", "full_features"],
+        "output_level": "complete"
+      },
+      "basic_analysis": {
+        "requires": ["model_available"],
+        "output_level": "essential"
+      },
+      "minimal_analysis": {
+        "requires": [],
+        "output_level": "minimal"
+      }
+    },
+    "error_categories": {
+      "model_failure": ["model_unavailable", "prediction_error", "confidence_calibration_failed"],
+      "data_insufficiency": ["insufficient_baseline", "missing_features", "low_sample_size"],
+      "resource_constraint": ["timeout", "memory_exceeded", "rate_limited"],
+      "validation_error": ["invalid_input", "unsupported_platform", "mode_mismatch"]
+    }
+  },
+  "security": {
+    "requires_auth": false,
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "no_external_scraping": true,
+    "audit_logging_required": true,
+    "input_validation": true,
+    "output_sanitization": true,
+    "rate_limiting_enforced": true,
+    "data_encryption": true
+  },
+  "performance_targets": {
+    "p95_processing_time_ms": 10000,
+    "cache_hit_ratio_target": 0.6,
+    "prediction_accuracy_target": 0.75,
+    "confidence_calibration_target": 0.8,
+    "uptime_target": 0.995
+  },
+  "audit_requirements": {
+    "mandatory_fields": ["evaluation_id", "timestamp", "evaluation_mode", "platform", "confidence_score", "model_version"],
+    "retention_period_days": 90,
+    "encryption_required": true,
+    "access_logging": true,
+    "change_tracking": true,
+    "compliance_checks": ["gdpr_compliant", "no_pii_storage", "audit_trail_complete"]
+  }
+}

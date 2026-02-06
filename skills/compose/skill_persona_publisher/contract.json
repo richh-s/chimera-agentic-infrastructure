@@ -1,0 +1,488 @@
+{
+  "skill_name": "skill_persona_publisher",
+  "version": "2.0.0",
+  "description": "Transforms validated content into platform-specific, persona-aligned publishable output without executing publication. Includes provenance tracking, quality gates, and enterprise compliance features.",
+  "inputs": {
+    "content": {
+      "type": "string",
+      "required": true,
+      "min_length": 10,
+      "max_length": 10000,
+      "description": "Approved content to be rewritten for persona and platform alignment.",
+      "example": "AI governance requires multi-stakeholder collaboration between industry, academia, and policymakers."
+    },
+    "persona": {
+      "type": "object",
+      "required": true,
+      "description": "Complete persona definition with voice, tone, style, and behavioral boundaries.",
+      "properties": {
+        "persona_id": {
+          "type": "string",
+          "pattern": "^persona_[a-zA-Z0-9_]+$",
+          "example": "persona_tech_analyst",
+          "description": "Unique identifier for the persona."
+        },
+        "voice": {
+          "type": "string",
+          "enum": ["authoritative", "playful", "analytical", "conversational", "provocative", "educational", "inspirational", "journalistic"],
+          "example": "analytical",
+          "description": "Primary voice characteristic guiding content transformation."
+        },
+        "tone": {
+          "type": "string",
+          "enum": ["formal", "neutral", "casual", "playful", "provocative", "urgent", "optimistic", "skeptical"],
+          "example": "neutral",
+          "description": "Emotional tone to apply to the output."
+        },
+        "target_audience": {
+          "type": "string",
+          "required": false,
+          "enum": ["general", "technical", "business", "consumer", "enthusiast", "academic"],
+          "default": "general",
+          "description": "Target audience for persona alignment."
+        },
+        "style_guidelines": {
+          "type": "array",
+          "items": { 
+            "type": "string" 
+          },
+          "minItems": 1,
+          "description": "Explicit stylistic rules (dos and don'ts).",
+          "example": ["Use active voice", "Include data points", "Avoid technical jargon", "Limit sentences to 25 words"]
+        },
+        "persona_boundaries": {
+          "type": "object",
+          "required": false,
+          "description": "Hard boundaries the persona cannot cross.",
+          "properties": {
+            "topics_allowed": { 
+              "type": "array", 
+              "items": { "type": "string" },
+              "example": ["technology", "innovation", "policy"]
+            },
+            "topics_forbidden": { 
+              "type": "array", 
+              "items": { "type": "string" },
+              "example": ["politics", "religion", "personal attacks"]
+            },
+            "max_hashtags": { 
+              "type": "integer", 
+              "minimum": 0, 
+              "maximum": 30,
+              "example": 5
+            },
+            "emoji_usage": { 
+              "type": "string", 
+              "enum": ["none", "minimal", "moderate", "liberal"],
+              "example": "minimal"
+            },
+            "url_policy": {
+              "type": "string",
+              "enum": ["allow", "limit_one", "forbid"],
+              "example": "allow"
+            }
+          }
+        },
+        "persona_version": {
+          "type": "string",
+          "required": false,
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "example": "2.1.0",
+          "description": "Semantic version of persona definition for audit and compatibility."
+        }
+      }
+    },
+    "platform": {
+      "type": "string",
+      "required": true,
+      "enum": ["X", "LinkedIn", "Instagram", "TikTok", "YouTube", "Bluesky", "Mastodon", "Generic"],
+      "example": "X",
+      "description": "Target platform for formatting and constraints."
+    },
+    "platform_specific_rules": {
+      "type": "object",
+      "required": false,
+      "description": "Platform-specific formatting overrides and optimizations.",
+      "properties": {
+        "max_characters": { 
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "example": 280
+        },
+        "hashtag_strategy": { 
+          "type": "string", 
+          "enum": ["inline", "trailing", "none", "optimized"],
+          "example": "trailing"
+        },
+        "line_break_style": { 
+          "type": "string", 
+          "enum": ["single", "double", "platform_default", "readability_optimized"],
+          "example": "single"
+        },
+        "url_handling": { 
+          "type": "string", 
+          "enum": ["shorten", "keep_full", "remove", "platform_optimized"],
+          "example": "shorten"
+        },
+        "media_accommodation": {
+          "type": "string",
+          "enum": ["none", "image_present", "video_present", "carousel"],
+          "example": "none"
+        }
+      }
+    },
+    "content_type": {
+      "type": "string",
+      "required": false,
+      "enum": ["social_post", "thread", "caption", "video_description", "comment", "article_summary"],
+      "default": "social_post",
+      "description": "Type of content being generated."
+    },
+    "constraints": {
+      "type": "object",
+      "required": false,
+      "description": "Optional hard constraints for output generation.",
+      "properties": {
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "example": 240
+        },
+        "required_hashtags": {
+          "type": "array",
+          "items": { 
+            "type": "string",
+            "pattern": "^#[a-zA-Z0-9_]+$"
+          },
+          "maxItems": 10,
+          "example": ["#AI", "#Governance"]
+        },
+        "forbidden_phrases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Phrases that must not appear in output.",
+          "example": ["guaranteed results", "click here"]
+        },
+        "call_to_action": {
+          "type": "string",
+          "description": "Optional CTA to include verbatim.",
+          "example": "Learn more in our latest report."
+        },
+        "required_mentions": {
+          "type": "array",
+          "items": { 
+            "type": "string",
+            "pattern": "^@[a-zA-Z0-9_]+$"
+          },
+          "maxItems": 5,
+          "example": ["@OpenAI", "@DeepMind"]
+        },
+        "content_structure": {
+          "type": "string",
+          "enum": ["paragraph", "bullet_points", "mixed", "platform_optimized", "thread_optimized"],
+          "example": "platform_optimized",
+          "description": "Preferred content structure for readability."
+        },
+        "keyword_inclusion": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Keywords that should be included when possible.",
+          "example": ["AI safety", "ethical framework"]
+        }
+      }
+    },
+    "content_provenance": {
+      "type": "object",
+      "required": false,
+      "description": "Provenance metadata for full audit trail and quality control.",
+      "properties": {
+        "source_skill": {
+          "type": "string",
+          "example": "skill_content_analyzer",
+          "description": "Previous skill that produced or approved this content."
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of original content for traceability."
+        },
+        "analysis_references": {
+          "type": "object",
+          "description": "References to analysis outputs for context-aware transformation.",
+          "properties": {
+            "topics": { 
+              "type": "array", 
+              "items": { "type": "string" },
+              "example": ["AI Governance", "Policy"]
+            },
+            "sentiment": { 
+              "type": "string",
+              "enum": ["positive", "neutral", "negative"],
+              "example": "neutral"
+            },
+            "confidence_score": { 
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "example": 0.85
+            },
+            "key_entities": {
+              "type": "array",
+              "items": { "type": "string" },
+              "example": ["European Union", "AI Act"]
+            }
+          }
+        },
+        "workflow_id": {
+          "type": "string",
+          "description": "ID of the workflow generating this content."
+        },
+        "task_id": {
+          "type": "string",
+          "description": "Planner task ID for cross-reference."
+        }
+      }
+    }
+  },
+  "outputs": {
+    "final_content": {
+      "type": "string",
+      "description": "Primary persona-aligned, platform-formatted content ready for publication review."
+    },
+    "alternative_variants": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "Alternative formulations for A/B testing or fallback options.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "content": { 
+            "type": "string" 
+          },
+          "variant_type": { 
+            "type": "string", 
+            "enum": ["short", "emotional", "data_driven", "question", "provocative", "summarized"] 
+          },
+          "confidence": { 
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "variant_metadata": {
+            "type": "object",
+            "properties": {
+              "character_count": { "type": "integer" },
+              "focus": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "formatting_metadata": {
+      "type": "object",
+      "description": "Detailed metrics and decisions about the formatting process.",
+      "properties": {
+        "character_count": { 
+          "type": "integer",
+          "minimum": 1
+        },
+        "hashtag_count": { 
+          "type": "integer",
+          "minimum": 0 
+        },
+        "line_breaks": { 
+          "type": "integer",
+          "minimum": 0 
+        },
+        "platform_constraints_applied": { 
+          "type": "boolean" 
+        },
+        "persona_adherence_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Score indicating how well output matches persona guidelines."
+        },
+        "platform_optimization_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Score indicating platform-specific optimization quality."
+        },
+        "readability_score": {
+          "type": "object",
+          "properties": {
+            "flesch_reading_ease": { 
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "grade_level": { 
+              "type": "number",
+              "minimum": 1
+            },
+            "sentence_variety": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "transformation_steps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of transformations applied (for audit)."
+        }
+      }
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall confidence that output matches persona, platform, and quality requirements."
+    },
+    "compliance_checks": {
+      "type": "object",
+      "description": "Compliance validation results against all constraints.",
+      "properties": {
+        "passed_initial_safety": { 
+          "type": "boolean" 
+        },
+        "within_character_limits": { 
+          "type": "boolean" 
+        },
+        "no_forbidden_phrases": { 
+          "type": "boolean" 
+        },
+        "persona_boundaries_respected": { 
+          "type": "boolean" 
+        },
+        "platform_constraints_met": { 
+          "type": "boolean" 
+        },
+        "all_required_elements_present": {
+          "type": "boolean",
+          "description": "Required hashtags, mentions, CTAs included."
+        },
+        "check_timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-blocking issues detected during generation requiring Judge awareness.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["length_risk", "tone_drift", "platform_edge", "persona_stretch", "readability_concern", "engagement_risk"]
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "generation_metadata": {
+      "type": "object",
+      "description": "Technical metadata about the generation process for audit and optimization.",
+      "properties": {
+        "model_version": { 
+          "type": "string" 
+        },
+        "processing_time_ms": { 
+          "type": "integer",
+          "minimum": 0 
+        },
+        "persona_version": { 
+          "type": "string" 
+        },
+        "platform_rules_version": { 
+          "type": "string" 
+        },
+        "generation_id": {
+          "type": "string",
+          "description": "Unique ID for this generation instance."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "cache_hit": {
+          "type": "boolean",
+          "description": "Whether this result was served from cache."
+        }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 20,
+    "rate_limit": "20/min",
+    "min_confidence_threshold": 0.7,
+    "max_input_content_length": 10000,
+    "max_output_content_length": 10000,
+    "supported_platforms": ["X", "LinkedIn", "Instagram", "TikTok", "YouTube", "Bluesky", "Mastodon", "Generic"],
+    "resource_limits": {
+      "memory_mb": 512,
+      "cpu_cores": 2,
+      "disk_mb": 100
+    }
+  },
+  "quality_gates": {
+    "min_persona_adherence": 0.8,
+    "min_platform_optimization": 0.7,
+    "min_overall_confidence": 0.7,
+    "max_warning_count": 3,
+    "readability_ranges": {
+      "flesch_min": 40,
+      "flesch_max": 100,
+      "grade_level_max": 12
+    },
+    "compliance_requirements": ["passed_initial_safety", "within_character_limits", "no_forbidden_phrases"]
+  },
+  "error_handling": {
+    "partial_results_allowed": false,
+    "fallback_strategy": "return_unformatted_content",
+    "fallback_options": {
+      "strategy": "simplify_style",
+      "max_attempts": 2,
+      "confidence_threshold": 0.6,
+      "escalation_path": "judge_review"
+    },
+    "recovery_strategies": ["simplify_style", "remove_optional_constraints", "switch_persona_variant", "platform_fallback", "escalate_to_judge"],
+    "error_categories": {
+      "persona_conflict": ["voice_mismatch", "tone_violation", "boundary_breach"],
+      "platform_constraint": ["length_exceeded", "format_invalid", "hashtag_overflow"],
+      "quality_threshold": ["confidence_too_low", "readability_poor", "adherence_insufficient"],
+      "technical": ["timeout", "resource_exhausted", "model_error"]
+    }
+  },
+  "security": {
+    "requires_auth": false,
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "no_external_posting": true,
+    "audit_logging_required": true,
+    "input_sanitization": true,
+    "output_validation": true,
+    "rate_limiting_enforced": true
+  },
+  "audit_requirements": {
+    "mandatory_fields": ["generation_id", "timestamp", "persona_id", "platform", "confidence_score"],
+    "retention_period_days": 90,
+    "encryption_required": true,
+    "access_logging": true
+  }
+}

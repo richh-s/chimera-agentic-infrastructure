@@ -1,0 +1,1014 @@
+{
+  "skill_name": "skill_memory_curator",
+  "version": "2.0.0",
+  "description": "Governs Chimera's long-term memory system. Curates, normalizes, deduplicates, redacts sensitive data, applies retention policies, and outputs governed memory action plans without directly mutating storage. Includes knowledge graph management, policy feedback, and continuous learning capabilities.",
+  "inputs": {
+    "memory_candidates": {
+      "type": "array",
+      "required": true,
+      "minItems": 1,
+      "maxItems": 100,
+      "description": "Candidate memory items from upstream skills for curation review and governance.",
+      "items": {
+        "type": "object",
+        "required": ["candidate_id", "kind", "content", "source", "confidence"],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^memcand_[a-zA-Z0-9_]{16}$",
+            "example": "memcand_20250206_abc123xyz",
+            "description": "Globally unique ID for candidate memory item."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "strategy_learning",
+              "platform_insight",
+              "persona_learning",
+              "trend_learning",
+              "safety_learning",
+              "cost_learning",
+              "workflow_learning",
+              "taxonomy_update",
+              "performance_pattern",
+              "audience_insight",
+              "content_style",
+              "timing_optimization",
+              "compliance_learning",
+              "risk_pattern",
+              "system_behavior",
+              "capability_discovery",
+              "other"
+            ],
+            "example": "platform_insight",
+            "description": "Semantic category of memory candidate."
+          },
+          "content": {
+            "type": "string",
+            "min_length": 5,
+            "max_length": 10000,
+            "example": "LinkedIn posts with question hooks achieve 42% higher engagement during business hours.",
+            "description": "Human-readable memory content proposed for storage."
+          },
+          "structured_content": {
+            "type": "object",
+            "required": false,
+            "description": "Optional structured representation for machine processing.",
+            "properties": {
+              "insight_type": { "type": "string" },
+              "metrics": { "type": "object" },
+              "conditions": { "type": "array", "items": { "type": "string" } },
+              "confidence_components": { "type": "object" }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "required": false,
+            "maxItems": 30,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]{1,50}$"
+            },
+            "example": ["linkedin", "hook_strategy", "business_hours", "engagement", "persona_tech_leader"],
+            "description": "Normalized tags for retrieval, filtering, and taxonomy alignment."
+          },
+          "priority": {
+            "type": "string",
+            "required": false,
+            "enum": ["low", "medium", "high", "critical"],
+            "default": "medium",
+            "description": "Importance ranking for retention and access decisions."
+          },
+          "expiration_hint": {
+            "type": "string",
+            "required": false,
+            "enum": ["ephemeral", "short_term", "medium_term", "long_term", "permanent"],
+            "default": "medium_term",
+            "description": "Source-provided hint about temporal relevance."
+          },
+          "related_entities": {
+            "type": "array",
+            "required": false,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["persona", "platform", "topic", "skill", "workflow", "campaign", "user_segment"]
+                },
+                "value": { "type": "string" },
+                "relationship": {
+                  "type": "string",
+                  "enum": ["about", "uses", "affects", "contradicts", "enhances", "limits"]
+                },
+                "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+              }
+            },
+            "description": "Entities referenced by this memory for relationship mapping."
+          },
+          "source": {
+            "type": "object",
+            "required": true,
+            "description": "Complete provenance and audit trail.",
+            "properties": {
+              "skill": {
+                "type": "string",
+                "pattern": "^skill_[a-zA-Z0-9_]+$",
+                "example": "skill_engagement_evaluator"
+              },
+              "workflow_id": {
+                "type": "string",
+                "pattern": "^wf_[a-zA-Z0-9_]+$"
+              },
+              "task_id": {
+                "type": "string",
+                "pattern": "^task_[a-zA-Z0-9_]+$"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2024-02-06T14:30:00Z"
+              },
+              "content_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "description": "SHA-256 hash of original source content for deduplication."
+              },
+              "context_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "description": "Hash of execution context for reproducibility."
+              }
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "example": 0.85,
+            "description": "Upstream confidence in insight correctness and utility."
+          },
+          "sensitivity_hints": {
+            "type": "array",
+            "required": false,
+            "items": {
+              "type": "string",
+              "enum": ["possible_pii", "possible_health", "possible_financial", "possible_secrets", "competitive_sensitive", "regulatory_sensitive", "unknown"]
+            },
+            "description": "Optional hints about sensitive content requiring special handling."
+          },
+          "validation_metadata": {
+            "type": "object",
+            "required": false,
+            "properties": {
+              "sample_size": { "type": "integer", "minimum": 1 },
+              "observation_period_days": { "type": "integer", "minimum": 1 },
+              "statistical_significance": { "type": "string", "enum": ["low", "medium", "high"] },
+              "reproducibility_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+            },
+            "description": "Metadata about insight validation and reliability."
+          }
+        }
+      }
+    },
+    "memory_policy": {
+      "type": "object",
+      "required": true,
+      "description": "Governance rules controlling memory lifecycle, access, retention, and quality.",
+      "properties": {
+        "policy_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "example": "2.1.0",
+          "description": "Semantic version of active memory policy."
+        },
+        "data_classification": {
+          "type": "string",
+          "enum": ["public", "internal", "confidential", "restricted"],
+          "default": "internal",
+          "description": "Maximum classification level for stored memories."
+        },
+        "allowed_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "example": ["strategy_learning", "platform_insight", "persona_learning", "workflow_learning"],
+          "description": "Memory kinds eligible for storage under current policy."
+        },
+        "forbidden_content_rules": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "string",
+            "enum": [
+              "no_pii",
+              "no_credentials",
+              "no_financial_data",
+              "no_health_data",
+              "no_personal_opinions",
+              "no_competitive_secrets",
+              "no_illegal_content",
+              "no_user_behavior_tracking",
+              "no_system_security_details"
+            ]
+          },
+          "description": "Absolute prohibitions for memory content."
+        },
+        "redaction_rules": {
+          "type": "object",
+          "required": false,
+          "description": "Pattern-based redaction for sensitive content.",
+          "properties": {
+            "email_patterns": { "type": "array", "items": { "type": "string" } },
+            "phone_patterns": { "type": "array", "items": { "type": "string" } },
+            "credit_card_patterns": { "type": "array", "items": { "type": "string" } },
+            "api_key_patterns": { "type": "array", "items": { "type": "string" } },
+            "custom_patterns": { "type": "array", "items": { "type": "string" } },
+            "redaction_marker": { "type": "string", "default": "[REDACTED]" }
+          }
+        },
+        "retention_policy": {
+          "type": "object",
+          "required": true,
+          "description": "Rules governing memory lifespan and archival.",
+          "properties": {
+            "default_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650,
+              "default": 180,
+              "description": "Default retention period for memories without overrides."
+            },
+            "kind_overrides": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3650
+              },
+              "example": { "safety_learning": 365, "taxonomy_update": 730 }
+            },
+            "priority_overrides": {
+              "type": "object",
+              "properties": {
+                "critical": { "type": "integer", "minimum": 365, "maximum": 3650, "default": 730 },
+                "high": { "type": "integer", "minimum": 180, "maximum": 730, "default": 365 },
+                "medium": { "type": "integer", "minimum": 90, "maximum": 365, "default": 180 },
+                "low": { "type": "integer", "minimum": 30, "maximum": 180, "default": 90 }
+              }
+            },
+            "auto_review_cycles": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "cycle_days": { "type": "integer", "minimum": 7, "maximum": 90, "default": 30 },
+                "confidence_decay_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.05 }
+              }
+            },
+            "archival_rules": {
+              "type": "object",
+              "properties": {
+                "archive_after_days": { "type": "integer", "minimum": 7, "default": 90 },
+                "archive_access_level": { "type": "string", "enum": ["read_only", "metadata_only", "restricted"], "default": "metadata_only" },
+                "compression_on_archive": { "type": "boolean", "default": true }
+              }
+            }
+          }
+        },
+        "confidence_thresholds": {
+          "type": "object",
+          "required": true,
+          "description": "Confidence-based decision boundaries.",
+          "properties": {
+            "min_accept": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.7 },
+            "min_auto_accept": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.85 },
+            "escalation_threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.5 },
+            "review_threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.6 }
+          }
+        },
+        "approval_workflow": {
+          "type": "object",
+          "required": true,
+          "description": "Human oversight and approval requirements.",
+          "properties": {
+            "require_human_approval_for": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "confidential",
+                  "taxonomy_update",
+                  "safety_learning",
+                  "policy_change",
+                  "high_risk",
+                  "first_of_kind",
+                  "contradicts_existing",
+                  "system_behavior"
+                ]
+              },
+              "default": ["confidential", "safety_learning", "policy_change"]
+            },
+            "auto_approval_limit_days": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 90,
+              "description": "Days of consistent pattern required for auto-approval."
+            },
+            "approval_chain": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["judge", "hitl", "governance_team", "data_steward", "security_review"]
+              },
+              "default": ["judge", "hitl"]
+            },
+            "emergency_override": {
+              "type": "object",
+              "properties": {
+                "allowed": { "type": "boolean", "default": false },
+                "required_audit_fields": { "type": "array", "items": { "type": "string" } },
+                "post_approval_required": { "type": "boolean", "default": true }
+              }
+            }
+          }
+        },
+        "compression_rules": {
+          "type": "object",
+          "required": false,
+          "description": "Content optimization and deduplication rules.",
+          "properties": {
+            "max_redundancy_ratio": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.3 },
+            "min_information_density": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.5 },
+            "allowed_compression_methods": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["summarization", "key_points", "normalization", "abstraction", "none"]
+              },
+              "default": ["key_points", "normalization"]
+            },
+            "deduplication_threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.9 }
+          }
+        },
+        "versioning_policy": {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": ["immutable", "versioned", "mutable_with_audit"],
+              "default": "versioned"
+            },
+            "max_versions": { "type": "integer", "minimum": 1, "default": 10 },
+            "version_retention_days": { "type": "integer", "minimum": 1, "default": 365 }
+          }
+        }
+      }
+    },
+    "existing_memory_index": {
+      "type": "array",
+      "required": false,
+      "maxItems": 500,
+      "description": "Lightweight index of existing memory entries for deduplication and relationship management.",
+      "items": {
+        "type": "object",
+        "required": ["memory_id", "kind", "content_hash", "last_updated"],
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "pattern": "^mem_[a-zA-Z0-9_]{16}$"
+          },
+          "kind": { "type": "string" },
+          "content_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "last_updated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "retention_days": { "type": "integer" },
+          "related_memory_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "relationship_context": {
+      "type": "object",
+      "required": false,
+      "description": "Context for establishing semantic relationships between memory items.",
+      "properties": {
+        "relationship_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["supports", "contradicts", "extends", "deprecates", "cites", "similar_to", "prerequisite_for", "alternative_to"]
+          },
+          "default": ["supports", "contradicts", "extends", "similar_to"]
+        },
+        "existing_relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_id": { "type": "string" },
+              "target_id": { "type": "string" },
+              "relationship_type": { "type": "string" },
+              "strength": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "last_verified": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "relationship_threshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.7,
+          "description": "Minimum confidence for suggesting new relationships."
+        },
+        "knowledge_graph_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+    "operation_mode": {
+      "type": "string",
+      "required": false,
+      "enum": ["curate_only", "propose_updates", "propose_deprecations", "full_analysis", "policy_test"],
+      "default": "curate_only",
+      "description": "Controls curator behavior and output granularity."
+    },
+    "curation_context": {
+      "type": "object",
+      "required": false,
+      "description": "Additional context for curation decisions.",
+      "properties": {
+        "campaign_id": { "type": "string" },
+        "learning_cycle": { "type": "integer", "minimum": 1 },
+        "memory_health_targets": {
+          "type": "object",
+          "properties": {
+            "max_redundancy": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "min_coverage": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "target_freshness_days": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "previous_curation_id": { "type": "string" }
+      }
+    }
+  },
+  "outputs": {
+    "curation_summary": {
+      "type": "object",
+      "required": true,
+      "description": "Executive summary of curation decisions and impact.",
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": ["pass", "review_required", "blocked", "partial_pass", "escalated"],
+          "description": "Overall batch decision."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable summary of curation outcomes."
+        },
+        "key_findings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Notable discoveries or patterns in the batch."
+        },
+        "policy_compliance_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Overall compliance with memory policy."
+        },
+        "memory_health_impact": {
+          "type": "object",
+          "properties": {
+            "coverage_improvement": {
+              "type": "number",
+              "minimum": -1.0,
+              "maximum": 1.0,
+              "description": "Change in knowledge coverage."
+            },
+            "redundancy_change": {
+              "type": "number",
+              "minimum": -1.0,
+              "maximum": 1.0,
+              "description": "Change in content redundancy."
+            },
+            "freshness_impact": {
+              "type": "number",
+              "minimum": -1.0,
+              "maximum": 1.0,
+              "description": "Impact on memory system freshness."
+            },
+            "relationship_density_change": {
+              "type": "number",
+              "minimum": -1.0,
+              "maximum": 1.0,
+              "description": "Change in knowledge graph connectivity."
+            }
+          }
+        },
+        "batch_statistics": {
+          "type": "object",
+          "properties": {
+            "total_candidates": { "type": "integer", "minimum": 0 },
+            "unique_insights": { "type": "integer", "minimum": 0 },
+            "average_confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "kind_distribution": { "type": "object" }
+          }
+        }
+      }
+    },
+    "accepted": {
+      "type": "array",
+      "description": "Accepted memory entries ready for storage (subject to final approval).",
+      "items": {
+        "type": "object",
+        "required": ["memory_record", "action", "confidence", "action_confidence"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["create", "update", "merge", "strengthen", "deprecate_suggestion", "archive_suggestion"],
+            "description": "Proposed storage action. Curator does NOT execute writes."
+          },
+          "action_confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Confidence in specific action recommendation."
+          },
+          "target_memory_id": {
+            "type": "string",
+            "pattern": "^mem_[a-zA-Z0-9_]{16}$",
+            "description": "For update/merge actions: target memory ID."
+          },
+          "memory_record": {
+            "type": "object",
+            "required": ["kind", "content", "tags", "retention_days", "confidence"],
+            "properties": {
+              "kind": { "type": "string" },
+              "content": { "type": "string" },
+              "structured_content": { "type": "object" },
+              "tags": { "type": "array", "items": { "type": "string" } },
+              "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "retention_days": { "type": "integer", "minimum": 1, "maximum": 3650 },
+              "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+              "expiration_category": { "type": "string", "enum": ["ephemeral", "short_term", "medium_term", "long_term", "permanent"] },
+              "related_entities": { "type": "array", "items": { "type": "object" } },
+              "validation_metadata": { "type": "object" }
+            }
+          },
+          "relationship_suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "related_memory_id": { "type": "string" },
+                "relationship_type": { "type": "string" },
+                "strength": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+                "evidence": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "description": "Suggested relationships to other memories."
+          },
+          "compression_metadata": {
+            "type": "object",
+            "properties": {
+              "original_length": { "type": "integer", "minimum": 1 },
+              "compressed_length": { "type": "integer", "minimum": 1 },
+              "compression_method": { "type": "string" },
+              "information_preserved": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "key_points_extracted": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "candidate_id": { "type": "string" },
+              "source_skill": { "type": "string" },
+              "workflow_id": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "curation_id": { "type": "string" }
+            }
+          },
+          "approval_requirements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["auto_approved", "judge_review", "hitl_review", "governance_team", "security_review"]
+            },
+            "description": "Required approval levels before storage."
+          }
+        }
+      }
+    },
+    "knowledge_graph_updates": {
+      "type": "array",
+      "description": "Suggested updates to memory knowledge graph for semantic search.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": ["add_node", "add_edge", "update_node", "update_edge", "remove_edge", "strengthen_edge", "weaken_edge"]
+          },
+          "node_id": { "type": "string" },
+          "node_type": { "type": "string" },
+          "edge_source": { "type": "string" },
+          "edge_target": { "type": "string" },
+          "edge_type": { "type": "string" },
+          "edge_strength": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "justification": { "type": "string" }
+        }
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "description": "Rejected candidates with detailed rejection reasons.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidate_id": { "type": "string" },
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "LOW_CONFIDENCE",
+              "NOT_ALLOWED_KIND",
+              "SENSITIVE_CONTENT",
+              "PII_DETECTED",
+              "SECRETS_DETECTED",
+              "DUPLICATE",
+              "TOO_VAGUE",
+              "POLICY_FORBIDDEN",
+              "REDUNDANT",
+              "CONTRADICTS_EXISTING",
+              "INSUFFICIENT_EVIDENCE",
+              "TEMPORAL_EXPIRATION",
+              "OTHER"
+            ]
+          },
+          "reason": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "policy_reference": { "type": "string" },
+          "suggestion": { "type": "string" },
+          "rejection_timestamp": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "redactions": {
+      "type": "array",
+      "description": "Transparent record of all redactions applied for audit.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidate_id": { "type": "string" },
+          "redaction_type": {
+            "type": "string",
+            "enum": ["pii", "secret", "financial", "health", "competitive", "regulatory", "other"]
+          },
+          "description": { "type": "string" },
+          "pattern_matched": { "type": "string" },
+          "redacted_content": { "type": "string" },
+          "replacement_content": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    },
+    "escalations": {
+      "type": "array",
+      "description": "Items requiring human review before memory write.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidate_id": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "why": { "type": "string" },
+          "recommended_next_step": {
+            "type": "string",
+            "enum": ["judge_review", "hitl_review", "governance_team", "security_review", "discard", "modify_and_resubmit"]
+          },
+          "deadline_hours": { "type": "integer", "minimum": 1 },
+          "approval_chain": { "type": "array", "items": { "type": "string" } },
+          "context_summary": { "type": "string" }
+        }
+      }
+    },
+    "policy_feedback": {
+      "type": "object",
+      "description": "Feedback on policy effectiveness for continuous improvement.",
+      "properties": {
+        "policy_gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "gap_type": { "type": "string" },
+              "example_candidate_id": { "type": "string" },
+              "description": { "type": "string" },
+              "suggestion": { "type": "string" },
+              "impact_level": { "type": "string", "enum": ["low", "medium", "high"] }
+            }
+          }
+        },
+        "rule_effectiveness": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "description": "Effectiveness scores for individual policy rules."
+        },
+        "recommended_updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "policy_component": { "type": "string" },
+              "current_value": { "type": "string" },
+              "recommended_value": { "type": "string" },
+              "reason": { "type": "string" },
+              "urgency": { "type": "string", "enum": ["low", "medium", "high"] }
+            }
+          }
+        },
+        "compliance_trend": {
+          "type": "object",
+          "properties": {
+            "last_30_days": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "last_90_days": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "trend": { "type": "string", "enum": ["improving", "stable", "declining"] }
+          }
+        }
+      }
+    },
+    "learning_metrics": {
+      "type": "object",
+      "description": "Metrics for curator model improvement and validation.",
+      "properties": {
+        "decision_consistency": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Consistency of similar curation decisions."
+        },
+        "false_positive_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Rate of incorrect acceptances."
+        },
+        "false_negative_rate": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Rate of incorrect rejections."
+        },
+        "coverage_gaps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Identified gaps in memory coverage."
+        },
+        "model_confidence_calibration": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "How well confidence scores match actual accuracy."
+        },
+        "performance_by_kind": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "acceptance_rate": { "type": "number" },
+              "average_confidence": { "type": "number" },
+              "escalation_rate": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall confidence in batch curation quality and compliance."
+    },
+    "curation_metadata": {
+      "type": "object",
+      "required": true,
+      "description": "Comprehensive metadata for audit, monitoring, and reproducibility.",
+      "properties": {
+        "curation_id": {
+          "type": "string",
+          "pattern": "^cur_[a-zA-Z0-9_]{16}$",
+          "example": "cur_20250206_xyz789abc"
+        },
+        "processing_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_version": { "type": "string" },
+        "policy_version": { "type": "string" },
+        "accepted_count": { "type": "integer", "minimum": 0 },
+        "rejected_count": { "type": "integer", "minimum": 0 },
+        "escalation_count": { "type": "integer", "minimum": 0 },
+        "redaction_count": { "type": "integer", "minimum": 0 },
+        "deduplication_count": { "type": "integer", "minimum": 0 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "operation_mode": { "type": "string" },
+        "resource_usage": {
+          "type": "object",
+          "properties": {
+            "memory_mb": { "type": "number" },
+            "cpu_percent": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+            "cache_hit_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+          }
+        },
+        "quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "high_rejection_rate",
+              "low_confidence_batch",
+              "policy_violations_detected",
+              "unusual_pattern_detected",
+              "resource_constraints",
+              "model_uncertainty"
+            ]
+          }
+        },
+        "next_review_schedule": {
+          "type": "object",
+          "properties": {
+            "auto_review_date": { "type": "string", "format": "date-time" },
+            "confidence_decay_estimate": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+          }
+        }
+      }
+    }
+  },
+  "constraints": {
+    "max_execution_time": 30,
+    "rate_limit": "15/min",
+    "max_candidates_per_batch": 100,
+    "max_content_length_chars": 10000,
+    "min_accept_confidence_default": 0.7,
+    "deduplication_required": true,
+    "redaction_required_for_sensitive": true,
+    "audit_trail_required": true,
+    "supported_operation_modes": ["curate_only", "propose_updates", "propose_deprecations", "full_analysis", "policy_test"],
+    "resource_limits": {
+      "memory_mb": 1024,
+      "cpu_cores": 2,
+      "disk_mb": 200,
+      "network_requests": 0,
+      "concurrent_operations": 1
+    },
+    "data_retention": {
+      "curation_results_days": 180,
+      "rejection_logs_days": 90,
+      "audit_logs_days": 365,
+      "learning_data_days": 730
+    },
+    "batch_processing": {
+      "min_batch_size_recommended": 5,
+      "max_relationships_per_memory": 20,
+      "max_tags_per_memory": 30,
+      "compression_ratio_target": 0.7
+    }
+  },
+  "quality_gates": {
+    "min_decision_confidence": 0.7,
+    "max_redundancy_threshold": 0.3,
+    "min_information_density": 0.5,
+    "max_escalation_rate": 0.2,
+    "policy_compliance_threshold": 0.9,
+    "memory_coverage_targets": {
+      "strategy_learning": 0.8,
+      "persona_learning": 0.85,
+      "platform_insight": 0.9,
+      "workflow_learning": 0.75
+    },
+    "performance_targets": {
+      "p95_processing_time_ms": 25000,
+      "cache_hit_ratio_target": 0.6,
+      "decision_consistency_target": 0.85,
+      "false_positive_max": 0.1,
+      "false_negative_max": 0.15
+    }
+  },
+  "error_handling": {
+    "partial_results_allowed": true,
+    "fallback_strategy": "reject_on_uncertainty_with_explanation",
+    "fallback_options": {
+      "simplify_analysis": {
+        "max_insights": 5,
+        "skip_relationships": true,
+        "skip_compression": false,
+        "confidence_adjustment": -0.15
+      },
+      "ignore_baseline": true,
+      "escalation_threshold": 0.4,
+      "minimum_viable_output": {
+        "curation_summary": true,
+        "curation_metadata": true,
+        "confidence_score": true,
+        "accepted": false,
+        "rejected": true
+      }
+    },
+    "recovery_strategies": ["simplify_analysis", "reduce_batch_size", "ignore_baseline", "use_conservative_policy", "escalate_to_judge"],
+    "degradation_modes": {
+      "full_analysis": {
+        "requires": ["model_available", "policy_loaded", "baseline_data", "full_features"],
+        "output_level": "complete",
+        "timeout_seconds": 30
+      },
+      "essential_analysis": {
+        "requires": ["model_available", "policy_loaded"],
+        "output_level": "essential",
+        "timeout_seconds": 15
+      },
+      "minimal_analysis": {
+        "requires": ["policy_loaded"],
+        "output_level": "minimal",
+        "timeout_seconds": 5
+      }
+    },
+    "error_categories": {
+      "validation_error": ["invalid_input", "oversized_batch", "unsupported_kind", "missing_required_fields"],
+      "policy_error": ["policy_missing", "policy_conflict", "unparseable_policy", "version_mismatch"],
+      "processing_error": ["timeout", "model_error", "dedup_failure", "redaction_failure", "relationship_error"],
+      "resource_error": ["memory_exceeded", "cpu_exceeded", "rate_limited", "disk_full"]
+    }
+  },
+  "security": {
+    "requires_auth": false,
+    "data_classification": "internal",
+    "privacy_preserving": true,
+    "no_external_lookups": true,
+    "pii_storage_forbidden": true,
+    "secrets_storage_forbidden": true,
+    "audit_logging_required": true,
+    "encryption_required": true,
+    "input_validation": true,
+    "output_sanitization": true,
+    "rate_limiting_enforced": true,
+    "access_control": {
+      "read": ["judge", "planner", "governance_team"],
+      "write": ["none"],
+      "execute": ["worker"]
+    }
+  },
+  "audit_requirements": {
+    "mandatory_fields": ["curation_id", "timestamp", "policy_version", "confidence_score", "accepted_count", "rejected_count", "escalation_count"],
+    "retention_period_days": 180,
+    "encryption_required": true,
+    "access_logging": true,
+    "change_tracking": true,
+    "integrity_checks": true,
+    "compliance_checks": ["gdpr_compliant", "no_pii_storage", "audit_trail_complete", "policy_versioned"]
+  },
+  "lifecycle_management": {
+    "versioning": {
+      "skill_version": "2.0.0",
+      "contract_version": "2.0.0",
+      "backward_compatible": false,
+      "deprecation_schedule_days": 90
+    },
+    "monitoring": {
+      "health_checks_required": true,
+      "performance_monitoring": true,
+      "error_rate_alerting": true,
+      "compliance_alerts": true
+    },
+    "maintenance": {
+      "model_retraining_cycle_days": 30,
+      "policy_review_cycle_days": 90,
+      "performance_review_cycle_days": 30
+    }
+  }
+}

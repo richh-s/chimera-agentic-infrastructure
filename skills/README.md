@@ -9,7 +9,7 @@ Authority remains with the **Planner**, **Judge**, and **Human-in-the-Loop (HITL
 
 ---
 
-##  Quick Overview
+## Quick Overview
 
 | Layer | Purpose | Example Skills | Status |
 |-------|---------|----------------|--------|
@@ -42,6 +42,7 @@ A Skill does **not**:
 - Publish content autonomously
 - Bypass safety, cost, or governance checks
 - Write directly to system memory or source code
+- Modify its own contract, limits, or execution rules at runtime
 
 ---
 
@@ -59,22 +60,22 @@ A Skill does **not**:
 Skills are organized by **intent-based layers** to prevent role leakage
 and enforce clean reasoning boundaries.
 
-###  Ingest — Content Acquisition
+### Ingest — Content Acquisition
 `ingest/`
 - `skill_media_harvester`
 
-###  Analyze — Signal Extraction & Understanding
+### Analyze — Signal Extraction & Understanding
 `analyze/`
 - `skill_vocal_analyzer`
 - `skill_content_analyzer`
 - `skill_trend_classifier`
 
-###  Govern — Safety, Compliance & Economics
+### Govern — Safety, Compliance & Economics
 `govern/`
 - `skill_safety_validator`
 - `skill_cost_guard`
 
-###  Compose — Content Transformation
+### Compose — Content Transformation
 `compose/`
 - `skill_persona_publisher`
 
@@ -82,11 +83,11 @@ and enforce clean reasoning boundaries.
 `orchestrate/`
 - `skill_workflow_orchestrator`
 
-###  Evaluate — Feedback & Performance
+### Evaluate — Feedback & Performance
 `evaluate/`
 - `skill_engagement_evaluator`
 
-###  Memory — Learning & Retention Control
+### Memory — Learning & Retention Control
 `memory/`
 - `skill_memory_curator`
 
@@ -184,7 +185,7 @@ Semantic Versioning (MAJOR.MINOR.PATCH)
 Deployment States
 State	Description	Judge Behavior
 development	In testing	HITL required
-staging	Pre-prod	Enhanced scrutiny
+staging	Pre-production	Enhanced scrutiny
 production	Live	Normal review
 deprecated	Phasing out	Warning
 retired	Disabled	Blocked
@@ -223,7 +224,7 @@ Production release
 Glossary
 Term	Definition
 Skill	Governed runtime capability
-Contract	Machine-readable I/O spec
+Contract	Machine-readable I/O specification
 MCP	Model Context Protocol
 Planner	Task creation component
 Worker	Skill execution component
