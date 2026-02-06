@@ -1,7 +1,7 @@
 IMAGE_NAME=chimera-governor
 CONTAINER_NAME=chimera-governor-test
 
-.PHONY: setup build test lint spec-check clean
+.PHONY: setup build test lint spec-check clean security check
 
 ## Build Docker image
 setup:
@@ -17,6 +17,14 @@ test:
 ## Run linting (Ruff) inside Docker
 lint:
 	docker run --rm $(IMAGE_NAME) "ruff check ."
+
+## Run security scanning (Bandit) inside Docker - skip assert statements
+security:
+	docker run --rm $(IMAGE_NAME) "bandit -r -x /app/.venv -s B101 /app"
+
+## Run all checks
+check: lint security
+	@echo "✓ All checks passed"
 
 ## Optional: verify spec structure exists
 spec-check:
