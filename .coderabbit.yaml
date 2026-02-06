@@ -1,0 +1,34 @@
+# .coderabbit.yaml
+# AI Governance Review Configuration — Project Chimera
+# VALIDATED VERSION (removes invalid property)
+
+language: "en-US"
+early_access: false
+
+reviews:
+  # Reviewer personality: firm, explicit, governance-first
+  profile: "assertive"
+
+  # Reviewer can block PRs (Governance Authority)
+  request_changes_workflow: true
+
+  # Executive summary for humans (Planner / Judge / HITL)
+  high_level_summary: true
+
+  # Professional tone only — no creative flair
+  poem: false
+
+  # Explicit decision signal
+  review_status: true
+
+  # Line-level, actionable feedback
+  review_details: true
+
+  # Automatic reviews on all non-draft PRs
+  auto_review:
+    enabled: true
+    drafts: false
+
+chat:
+  # AI does NOT participate in discussions unless explicitly invoked
+  auto_reply: false
