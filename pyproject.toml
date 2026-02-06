@@ -11,15 +11,50 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.0",
+    "ruff>=0.4.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.ruff]
+# Match Python version used in Docker
+target-version = "py312"
+
+# Fail fast on real issues, not style bikeshedding
+line-length = 100
+
+# Lint only real code, not specs or research artifacts
+exclude = [
+    "specs",
+    "research",
+    ".venv",
+    "__pycache__",
+]
+
+# Enable governance-relevant rule sets
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports, undefined names)
+    "B",   # flake8-bugbear (likely bugs)
+    "S",   # bandit-like security rules
+    "I",   # import order
+]
+
+# Explicitly ignore rules that don't add governance value
+ignore = [
+    "E501",  # line length (handled separately)
+]
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+# Prevent accidental packaging of non-runtime directories
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["specs*", "research*", "skills*"]
+exclude = [
+    "specs*",
+    "research*",
+    "skills*",
+]

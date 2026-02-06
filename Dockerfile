@@ -19,4 +19,8 @@ RUN uv pip install --system --group dev
 
 COPY . .
 
-CMD ["pytest"]
+
+RUN useradd -m chimera
+USER chimera
+
+ENTRYPOINT ["pytest"]
