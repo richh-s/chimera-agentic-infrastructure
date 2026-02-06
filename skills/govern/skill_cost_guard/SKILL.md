@@ -10,11 +10,7 @@
 
 ## Purpose
 
-The **Cost Guard** enforces Chimera's **economic governance** by preventing
-unbounded or irresponsible spending during autonomous execution.
-
-It ensures agents remain **financially aligned** with campaign budgets,
-daily limits, and risk tolerance.
+The **Cost Guard** enforces Chimera's **economic governance** by preventing unbounded or irresponsible spending during autonomous execution. It ensures agents remain **financially aligned** with campaign budgets, daily limits, and risk tolerance.
 
 ---
 
@@ -156,59 +152,56 @@ flowchart LR
     style C fill:#e8f5e8
     style F fill:#ffebee
     style H fill:#fce4ec
-Cost & Performance
-No external billing calls — All calculations internal
+```
 
-Deterministic runtime — Predictable performance under load
+## Cost & Performance
 
-Average latency: < 50ms per evaluation
+**No external billing calls** — All calculations internal
 
-Throughput: 30 evaluations per minute
+**Deterministic runtime** — Predictable performance under load
 
-Stateless operation — No persistent budget state
+**Average latency**: < 50ms per evaluation
 
-Cache-friendly — Results cacheable by input hash (5-minute TTL)
+**Throughput**: 30 evaluations per minute
 
-Resource Requirements:
-Memory: 128MB RAM
+**Stateless operation** — No persistent budget state
 
-CPU: 1 core
+**Cache-friendly** — Results cacheable by input hash (5-minute TTL)
 
-Storage: 50MB for pricing model cache
+### Resource Requirements:
+- **Memory**: 128MB RAM
+- **CPU**: 1 core
+- **Storage**: 50MB for pricing model cache
+- **Network**: None required (fully self-contained)
 
-Network: None required (fully self-contained)
+---
 
-Compliance & Auditability
-Audit Requirements:
-All decisions logged with full input/output context
+## Compliance & Auditability
 
-Budget evaluations auditable for 90+ days
+### Audit Requirements:
+- All decisions logged with full input/output context
+- Budget evaluations auditable for 90+ days
+- Pricing model versioned and change-tracked
+- Threshold adjustments documented and justified
 
-Pricing model versioned and change-tracked
+### Financial Controls:
+- No external billing system access — prevents accidental charges
+- Budget integrity checks — detect tampering or corruption
+- Cost data encryption — protect financial information
+- Retroactive cost analysis — support post-mortem reviews
 
-Threshold adjustments documented and justified
+### Governance:
+- Regular pricing model reviews — ensure accuracy
+- Budget exception reporting — track all overrides
+- Cost efficiency reporting — identify optimization opportunities
+- Compliance attestations — regular financial governance checks
 
-Financial Controls:
-No external billing system access — prevents accidental charges
+---
 
-Budget integrity checks — detect tampering or corruption
+## Integration Examples
 
-Cost data encryption — protect financial information
-
-Retroactive cost analysis — support post-mortem reviews
-
-Governance:
-Regular pricing model reviews — ensure accuracy
-
-Budget exception reporting — track all overrides
-
-Cost efficiency reporting — identify optimization opportunities
-
-Compliance attestations — regular financial governance checks
-
-Integration Examples
-Basic Cost Evaluation:
-json
+### Basic Cost Evaluation:
+```json
 {
   "skill": "skill_cost_guard",
   "inputs": {
@@ -243,8 +236,10 @@ json
     "risk_tolerance": "medium"
   }
 }
-With Budget Warning:
-json
+```
+
+### With Budget Warning:
+```json
 {
   "skill": "skill_cost_guard",
   "inputs": {
@@ -260,8 +255,10 @@ json
   }
 }
 // Returns: {"cost_decision": "warn", "alerts": [...]}
-Priority-Based Exception:
-json
+```
+
+### Priority-Based Exception:
+```json
 {
   "skill": "skill_cost_guard",
   "inputs": {
@@ -279,15 +276,18 @@ json
   }
 }
 // May return "warn" instead of "block" for critical priority
-Summary
-The Cost Guard prevents Chimera from becoming economically reckless.
+```
 
-It ensures autonomy remains:
+---
 
-Bounded — within defined financial constraints
-Predictable — with clear cost projections and alerts
-Financially Responsible — optimizing spend without compromising outcomes
+## Summary
 
-No surprises. No runaway spend. No silent failures.
+The **Cost Guard** prevents Chimera from becoming economically reckless. It ensures autonomy remains:
+
+- **Bounded** — within defined financial constraints
+- **Predictable** — with clear cost projections and alerts
+- **Financially Responsible** — optimizing spend without compromising outcomes
+
+**No surprises. No runaway spend. No silent failures.**
 
 The guardian of your budget, ensuring every dollar spent delivers maximum value.
