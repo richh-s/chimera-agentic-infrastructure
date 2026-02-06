@@ -10,7 +10,11 @@
 
 ## Purpose
 
-The **Cost Guard** enforces Chimera's **economic governance** by preventing unbounded or irresponsible spending during autonomous execution. It ensures agents remain **financially aligned** with campaign budgets, daily limits, and risk tolerance.
+The **Cost Guard** enforces Chimera's **economic governance** by preventing
+unbounded or irresponsible spending during autonomous execution.
+
+It ensures agents remain **financially aligned** with campaign budgets,
+daily limits, and risk tolerance.
 
 ---
 
@@ -35,11 +39,11 @@ The **Cost Guard** enforces Chimera's **economic governance** by preventing unbo
 
 ## Cost Decision Semantics
 
-| Decision | Confidence Threshold | Meaning | Default Action |
-|----------|---------------------|---------|----------------|
-| `allow` | ≥ 0.8 | Cost within safe bounds | Proceed with execution |
-| `warn` | 0.6–0.79 | Approaching budget limits | Proceed with warning alerts |
-| `block` | < 0.6 | Budget exceeded or unsafe | Halt & escalate to Judge |
+| Decision | Confidence Threshold | Meaning                        | Default Action                      |
+|----------|----------------------|--------------------------------|-------------------------------------|
+| `allow`  | ≥ 0.8                | Cost within safe bounds        | Proceed with execution              |
+| `warn`   | 0.6–0.79             | Approaching budget limits      | Proceed with warning alerts         |
+| `block`  | < 0.6                | Budget exceeded or unsafe      | Halt & escalate to Judge            |
 
 ⚠️ **All decisions are advisory.**  
 The Judge and Human Governor retain final authority over budget exceptions.
@@ -48,13 +52,13 @@ The Judge and Human Governor retain final authority over budget exceptions.
 
 ## Budget Threshold Framework
 
-| Threshold Type | Default Value | Trigger Condition | Required Action |
-|----------------|---------------|-------------------|-----------------|
-| **Warning Threshold** | 75% of budget | Projected spend reaches threshold | Emit warning, continue monitoring |
-| **Block Threshold** | 90% of budget | Actual spend reaches threshold | Block new tasks, allow in-progress |
-| **Hard Stop** | 100% of budget | Budget fully exhausted | Immediate halt, escalate to HITL |
-| **Daily Burst Limit** | 50% of daily budget | Hourly spend exceeds limit | Throttle execution, defer tasks |
-| **Task Cost Ceiling** | $10.00 per task | Single task cost exceeds limit | Block task, suggest alternatives |
+| Threshold Type        | Default Value       | Trigger Condition                        | Required Action                          |
+|-----------------------|---------------------|------------------------------------------|------------------------------------------|
+| **Warning Threshold** | 75% of budget       | Projected spend reaches threshold        | Emit warning, continue monitoring        |
+| **Block Threshold**   | 90% of budget       | Actual spend reaches threshold           | Block new tasks, allow in-progress       |
+| **Hard Stop**         | 100% of budget      | Budget fully exhausted                   | Immediate halt, escalate to HITL         |
+| **Daily Burst Limit** | 50% of daily budget | Hourly spend exceeds limit               | Throttle execution, defer tasks          |
+| **Task Cost Ceiling** | $10.00 per task     | Single task cost exceeds limit           | Block task, suggest alternatives         |
 
 **Thresholds are adjustable** based on `risk_tolerance` input:
 - `low`: More conservative (60% warning, 75% block)
@@ -87,13 +91,13 @@ The Judge and Human Governor retain final authority over budget exceptions.
 
 ## Optimization Recommendation Categories
 
-| Category | Example Recommendations | Expected Savings |
-|----------|------------------------|------------------|
-| **Skill-Level** | Use `fast` instead of `accurate` mode | 40–60% |
-| **Temporal** | Defer to next budget window | 100% (deferred) |
-| **Architectural** | Cache results, reduce redundancy | 20–30% |
-| **Scope** | Reduce analysis depth or breadth | 25–50% |
-| **Alternative** | Use different skill combination | 15–35% |
+| Category       | Example Recommendations                        | Expected Savings   |
+|----------------|------------------------------------------------|--------------------|
+| **Skill-Level**   | Use `fast` instead of `accurate` mode          | 40–60%            |
+| **Temporal**      | Defer to next budget window                    | 100% (deferred)   |
+| **Architectural** | Cache results, reduce redundancy               | 20–30%            |
+| **Scope**         | Reduce analysis depth or breadth               | 25–50%            |
+| **Alternative**   | Use different skill combination                | 15–35%            |
 
 ### Example Recommendations:
 - **Reduce analysis depth** from `deep` to `standard`
@@ -123,13 +127,13 @@ The Judge and Human Governor retain final authority over budget exceptions.
 
 ## Failure Modes & Recovery
 
-| Error Code | Description | Automatic Behavior | Recovery Strategy |
-|------------|-------------|-------------------|-------------------|
-| `MISSING_BUDGET_CONTEXT` | No budget data provided | Block execution | Require budget context |
-| `INVALID_COST_ESTIMATE` | Cost estimate malformed or unrealistic | Block execution | Request validated estimate |
-| `CALCULATION_ERROR` | Internal computation failure | Escalate to Judge | System restart needed |
-| `TIMEOUT` | Evaluation exceeds 15 seconds | Block for safety | Use cached decision if available |
-| `BUDGET_CORRUPTION` | Inconsistent budget data detected | Block & escalate immediately | Human audit required |
+| Error Code              | Description                              | Automatic Behavior              | Recovery Strategy             |
+|-------------------------|------------------------------------------|----------------------------------|-------------------------------|
+| `MISSING_BUDGET_CONTEXT` | No budget data provided                 | Block execution                 | Require budget context        |
+| `INVALID_COST_ESTIMATE`  | Cost estimate malformed or unrealistic  | Block execution                 | Request validated estimate    |
+| `CALCULATION_ERROR`      | Internal computation failure            | Escalate to Judge               | System restart needed         |
+| `TIMEOUT`                | Evaluation exceeds 15 seconds           | Block for safety                | Use cached decision if available |
+| `BUDGET_CORRUPTION`      | Inconsistent budget data detected       | Block & escalate immediately    | Human audit required          |
 
 **Fail-closed by default** — any uncertainty results in blocking to prevent unbounded spend.
 
@@ -152,57 +156,47 @@ flowchart LR
     style C fill:#e8f5e8
     style F fill:#ffebee
     style H fill:#fce4ec
-```
+Cost & Performance
 
-## Cost & Performance
+No external billing calls — All calculations internal
+Deterministic runtime — Predictable performance under load
+Average latency: < 50ms per evaluation
+Throughput: 30 evaluations per minute
+Stateless operation — No persistent budget state
+Cache-friendly — Results cacheable by input hash (5-minute TTL)
 
-**No external billing calls** — All calculations internal
+Resource Requirements:
 
-**Deterministic runtime** — Predictable performance under load
+Memory: 128MB RAM
+CPU: 1 core
+Storage: 50MB for pricing model cache
+Network: None required (fully self-contained)
 
-**Average latency**: < 50ms per evaluation
+Compliance & Auditability
+Audit Requirements:
 
-**Throughput**: 30 evaluations per minute
+All decisions logged with full input/output context
+Budget evaluations auditable for 90+ days
+Pricing model versioned and change-tracked
+Threshold adjustments documented and justified
 
-**Stateless operation** — No persistent budget state
+Financial Controls:
 
-**Cache-friendly** — Results cacheable by input hash (5-minute TTL)
+No external billing system access — prevents accidental charges
+Budget integrity checks — detect tampering or corruption
+Cost data encryption — protect financial information
+Retroactive cost analysis — support post-mortem reviews
 
-### Resource Requirements:
-- **Memory**: 128MB RAM
-- **CPU**: 1 core
-- **Storage**: 50MB for pricing model cache
-- **Network**: None required (fully self-contained)
+Governance:
 
----
+Regular pricing model reviews — ensure accuracy
+Budget exception reporting — track all overrides
+Cost efficiency reporting — identify optimization opportunities
+Compliance attestations — regular financial governance checks
 
-## Compliance & Auditability
-
-### Audit Requirements:
-- All decisions logged with full input/output context
-- Budget evaluations auditable for 90+ days
-- Pricing model versioned and change-tracked
-- Threshold adjustments documented and justified
-
-### Financial Controls:
-- No external billing system access — prevents accidental charges
-- Budget integrity checks — detect tampering or corruption
-- Cost data encryption — protect financial information
-- Retroactive cost analysis — support post-mortem reviews
-
-### Governance:
-- Regular pricing model reviews — ensure accuracy
-- Budget exception reporting — track all overrides
-- Cost efficiency reporting — identify optimization opportunities
-- Compliance attestations — regular financial governance checks
-
----
-
-## Integration Examples
-
-### Basic Cost Evaluation:
-```json
-{
+Integration Examples
+Basic Cost Evaluation:
+JSON{
   "skill": "skill_cost_guard",
   "inputs": {
     "task_context": {
@@ -236,11 +230,8 @@ flowchart LR
     "risk_tolerance": "medium"
   }
 }
-```
-
-### With Budget Warning:
-```json
-{
+With Budget Warning:
+JSON{
   "skill": "skill_cost_guard",
   "inputs": {
     "task_context": { ... },
@@ -255,11 +246,8 @@ flowchart LR
   }
 }
 // Returns: {"cost_decision": "warn", "alerts": [...]}
-```
-
-### Priority-Based Exception:
-```json
-{
+Priority-Based Exception:
+JSON{
   "skill": "skill_cost_guard",
   "inputs": {
     "task_context": {
@@ -276,18 +264,13 @@ flowchart LR
   }
 }
 // May return "warn" instead of "block" for critical priority
-```
+Summary
+The Cost Guard prevents Chimera from becoming economically reckless.
+It ensures autonomy remains:
 
----
+Bounded — within defined financial constraints
+Predictable — with clear cost projections and alerts
+Financially Responsible — optimizing spend without compromising outcomes
 
-## Summary
-
-The **Cost Guard** prevents Chimera from becoming economically reckless. It ensures autonomy remains:
-
-- **Bounded** — within defined financial constraints
-- **Predictable** — with clear cost projections and alerts
-- **Financially Responsible** — optimizing spend without compromising outcomes
-
-**No surprises. No runaway spend. No silent failures.**
-
+No surprises. No runaway spend. No silent failures.
 The guardian of your budget, ensuring every dollar spent delivers maximum value.
